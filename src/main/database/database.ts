@@ -17,6 +17,7 @@ ALTER TABLE saved_requests ADD COLUMN body_json TEXT NOT NULL DEFAULT '{"type":"
 ALTER TABLE saved_requests ADD COLUMN settings_json TEXT NOT NULL DEFAULT '{"timeoutMs":30000}';
 CREATE TABLE request_history(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,saved_request_id TEXT REFERENCES saved_requests(id) ON DELETE SET NULL,request_name TEXT NOT NULL,method TEXT NOT NULL,url_template TEXT NOT NULL,resolved_url_redacted TEXT NOT NULL,started_at TEXT NOT NULL,completed_at TEXT,duration_ms INTEGER,status_code INTEGER,status_text TEXT,request_snapshot_json TEXT NOT NULL,response_headers_json TEXT NOT NULL DEFAULT '{}',response_body_kind TEXT,response_body_text TEXT,response_file_path TEXT,response_size_bytes INTEGER NOT NULL DEFAULT 0,content_type TEXT,error_json TEXT,was_cancelled INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL);
 CREATE INDEX request_history_workspace_created_idx ON request_history(workspace_id,created_at DESC);`
+const schemaV3=`CREATE TABLE response_resources(id TEXT PRIMARY KEY,history_id TEXT NOT NULL REFERENCES request_history(id) ON DELETE CASCADE,source TEXT NOT NULL,kind TEXT NOT NULL,declared_mime_type TEXT,detected_mime_type TEXT,effective_mime_type TEXT,path TEXT NOT NULL,byte_length INTEGER NOT NULL,suggested_filename TEXT NOT NULL,warnings_json TEXT NOT NULL DEFAULT '[]',digest TEXT,created_at TEXT NOT NULL,UNIQUE(history_id,source,digest));CREATE INDEX response_resources_history_idx ON response_resources(history_id);`
 
 export function createDatabase(path: string): Database.Database {
   const db = new Database(path)
@@ -31,5 +32,6 @@ export function createDatabase(path: string): Database.Database {
     db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(2,?)').run(new Date().toISOString())
     db.pragma('user_version = 2')
   })()
+  if(Number(db.pragma('user_version',{simple:true}))<3)db.transaction(()=>{db.exec(schemaV3);db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(3,?)').run(new Date().toISOString());db.pragma('user_version = 3')})()
   return db
 }
