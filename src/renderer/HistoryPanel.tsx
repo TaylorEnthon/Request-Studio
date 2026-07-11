@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import HttpResponsePanel from './HttpResponsePanel'
 export default function HistoryPanel({
   workspaceId,
   collectionId,
@@ -69,6 +70,7 @@ export default function HistoryPanel({
           >
             Create saved request
           </button>
+          {selected.status_code&&<HttpResponsePanel error="" response={{historyId:selected.id,status:selected.status_code,statusText:selected.status_text,durationMs:selected.duration_ms,sizeBytes:selected.response_size_bytes,kind:selected.response_body_kind,headers:JSON.parse(selected.response_headers_json||'{}'),text:selected.response_body_text,contentType:selected.content_type,resource:selected.resource,classification:{declaredMimeType:selected.content_type?.split(';')[0]?.toLowerCase()||null,detectedMimeType:selected.resource?.detectedMimeType||null,warnings:selected.resource?.warnings||[]}}}/>}
         </div>
       )}
     </section>
