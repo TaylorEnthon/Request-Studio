@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:all": "npm run lint && npm run typecheck && npm test && npm run build",
     "smoke:database": "tsx scripts/database-smoke.ts",
-    "smoke:electron": "node scripts/electron-smoke.mjs"
+    "smoke:electron": "node scripts/electron-smoke.mjs",
+    "test:http": "vitest run src/main/http src/main/history src/shared/schemas/http.test.ts"
   },
   "keywords": [],
   "author": "",

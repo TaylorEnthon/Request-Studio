@@ -1,0 +1,5 @@
+import { expect,it } from 'vitest'
+import { createDatabase } from '../database/database'
+import { HistoryRepository } from './history-repository'
+
+it('keeps history after saved request deletion and cascades with workspace',()=>{const db=createDatabase(':memory:');db.prepare("insert into workspaces values('w','W','x','x')").run();db.prepare("insert into collections values('c','w','C','x','x')").run();db.prepare("insert into saved_requests(id,workspace_id,collection_id,name,protocol,method,url,description,created_at,updated_at) values('r','w','c','R','http','GET','','','x','x')").run();db.prepare("insert into request_history(id,workspace_id,saved_request_id,request_name,method,url_template,resolved_url_redacted,started_at,request_snapshot_json,created_at) values('h','w','r','R','GET','','','x','{}','x')").run();db.prepare("delete from saved_requests where id='r'").run();expect((new HistoryRepository(db).get('h','w') as any).saved_request_id).toBeNull();db.prepare("delete from workspaces where id='w'").run();expect(new HistoryRepository(db).list('w')).toHaveLength(0);db.close()})
