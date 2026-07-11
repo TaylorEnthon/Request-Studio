@@ -2,9 +2,11 @@
 
 Request Studio is a local-first Windows desktop workspace for developer API experiments. Milestone 1 manages workspaces, flat collections, environments, secret-marked variables, and HTTP/WebSocket/SSE request drafts in SQLite through a secure Electron boundary.
 
+[![CI](https://github.com/TaylorEnthon/Request-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/TaylorEnthon/Request-Studio/actions/workflows/ci.yml)
+
 ## Status
 
-The desktop foundation and local data model are implemented. Network execution, response viewing, uploads, media, history, experiments, comparison, curl import, code generation, and installer publication are not implemented.
+Milestone 1 is complete: environment rename, variable editing, per-workspace environment selection persistence, and Windows CI are included. Network execution, response viewing, uploads, media, history, experiments, comparison, curl import, code generation, and installer publication are not implemented.
 
 ## Development
 

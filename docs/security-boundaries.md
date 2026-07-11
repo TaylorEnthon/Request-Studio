@@ -5,3 +5,5 @@
 - Main uses parameterized SQL for values and enables SQLite foreign keys.
 - Errors crossing IPC are stable display-safe objects without stack traces.
 - Secret-bearing keys are recursively redacted. Local secret encryption is not yet implemented.
+
+Future secret-at-rest work will encrypt values in Main with Electron `safeStorage`, store an encryption version beside the payload, migrate existing plaintext transactionally, handle `safeStorage` unavailability explicitly, and document that encrypted backups are machine-bound.
