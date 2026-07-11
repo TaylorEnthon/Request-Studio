@@ -5,3 +5,5 @@ Schema version 1 contains `workspaces`, `collections`, `environments`, `environm
 Per-workspace environment selection uses `app_settings` keys shaped as `selectedEnvironment:<workspaceId>`; this avoids a schema migration and safely tolerates deleted environments.
 
 Schema version 2 adds `params_json`, `headers_json`, `auth_json`, `body_json`, and `settings_json` to saved requests plus `request_history`. JSON columns are individually Zod-validated. History cascades with Workspace deletion and uses `ON DELETE SET NULL` for Saved Request deletion.
+
+Schema version 3 adds `response_resources`, keyed by resource ID and `history_id`. It stores classification metadata and an internal managed path; IPC removes that path. Foreign-key cascade and History cleanup delete response/extraction assets, while exported and request-upload files remain unmanaged.

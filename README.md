@@ -27,3 +27,5 @@ Production data is stored in `request-studio.db` under Electron's standard `user
 ## Security
 
 The renderer is sandboxed with context isolation and no Node integration. Real HTTP requests, files, SQLite, cancellation, and history remain in Main behind named Zod-validated IPC methods. HTML/XML responses are text only. Secret variables are redacted from history/logs but remain plain text in the local Environment table; `safeStorage` remains a later security increment.
+
+Milestone 3 adds smart MIME/signature classification, managed image/audio/video/PDF previews, bounded Binary Hex inspection, manual JSON Base64 extraction, Range streaming, and safe Save As. Playback depends on Chromium codec support; response HTML and SVG are never executed.

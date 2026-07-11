@@ -9,3 +9,5 @@
 Future secret-at-rest work will encrypt values in Main with Electron `safeStorage`, store an encryption version beside the payload, migrate existing plaintext transactionally, handle `safeStorage` unavailability explicitly, and document that encrypted backups are machine-bound.
 
 HTTP does not weaken the boundary: Renderer has no target fetch or path-reading API. File selection returns opaque session references; Main rejects symlinks/non-files and files above 100 MiB. TLS verification is never disabled, response HTML is never executed, and credential-bearing fields are redacted from history.
+
+Media uses a secure custom protocol with UUID lookup, realpath containment, bounded preview reads, and Range streaming. CSP permits the scheme only for images, media, and frames. HTML/SVG are escaped, PDF uses a sandboxed iframe, popups/navigation are denied, and saved files are never opened automatically. Environment secrets remain plaintext in local SQLite and redacted History still cannot be rerun.
