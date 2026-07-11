@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "test:all": "npm run lint && npm run typecheck && npm test && npm run build"
+    "test:all": "npm run lint && npm run typecheck && npm test && npm run build",
+    "smoke:database": "tsx scripts/database-smoke.ts",
+    "smoke:electron": "node scripts/electron-smoke.mjs"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +29,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

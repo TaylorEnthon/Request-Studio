@@ -10,3 +10,5 @@ export const savedRequestInputSchema = z.object({
 export const idInputSchema = z.object({ id: idSchema })
 export const scopedNameSchema = z.object({ workspaceId: idSchema, name: z.string().trim().min(1).max(100) })
 export const variableInputSchema = z.object({ environmentId: idSchema, key: z.string().trim().min(1), value: z.string(), isSecret: z.boolean(), description: z.string() })
+export const environmentRenameSchema = z.object({ id: idSchema, workspaceId: idSchema, name: z.string().trim().min(1).max(100) }).strict()
+export const variableUpdateSchema = z.object({ id: idSchema, environmentId: idSchema, key: z.string().trim().min(1).max(100), value: z.string(), isSecret: z.boolean(), description: z.string().max(500) }).strict()
