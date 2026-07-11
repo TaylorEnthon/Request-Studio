@@ -6,7 +6,7 @@ Request Studio is a local-first Windows desktop workspace for developer API expe
 
 ## Status
 
-Milestone 1 is complete: environment rename, variable editing, per-workspace environment selection persistence, and Windows CI are included. Network execution, response viewing, uploads, media, history, experiments, comparison, curl import, code generation, and installer publication are not implemented.
+Milestone 2 adds Main-process HTTP execution, Params, Headers, Auth, six body modes, environment resolution, timeout/cancel, response inspection, controlled file selection, and persistent redacted history. WebSocket, SSE, media preview, experiments, comparison, curl import, code generation, and installer publication are not implemented.
 
 ## Development
 
@@ -17,10 +17,13 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run test:http
+npm run smoke:database
+npm run smoke:electron
 ```
 
 Production data is stored in `request-studio.db` under Electron's standard `userData` directory. Tests use in-memory SQLite and never touch that file.
 
 ## Security
 
-The renderer is sandboxed with context isolation and no Node integration. It can call only named preload methods. SQLite stays in the main process. Secret variables are masked in the UI and redacted from logs, but Milestone 1 stores them as plain text locally; `safeStorage` encryption is planned for a later security increment.
+The renderer is sandboxed with context isolation and no Node integration. Real HTTP requests, files, SQLite, cancellation, and history remain in Main behind named Zod-validated IPC methods. HTML/XML responses are text only. Secret variables are redacted from history/logs but remain plain text in the local Environment table; `safeStorage` remains a later security increment.
