@@ -33,4 +33,7 @@ export class Repository {
     if (fallback) this.setting(key,fallback); else this.clearSetting(key)
     return fallback
   }
+  deleteWorkspace(id: string) {
+    this.db.transaction(()=>{this.clearSetting(`selectedEnvironment:${id}`);this.db.prepare('DELETE FROM workspaces WHERE id=?').run(id)})()
+  }
 }

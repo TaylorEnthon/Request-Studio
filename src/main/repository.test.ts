@@ -36,3 +36,11 @@ it('renames an environment only inside its workspace', () => {
   expect(repo.renameEnvironment('e','w2','Wrong')).toBeUndefined()
   expect(repo.renameEnvironment('e','w1','Test')).toMatchObject({name:'Test',workspace_id:'w1'})
 })
+
+it('deletes workspace data and its selected environment setting together', () => {
+  const db=createDatabase(':memory:');databases.push(db);const repo=new Repository(db)
+  repo.create('workspaces',{id:'w',name:'One'});repo.create('environments',{id:'e',workspace_id:'w',name:'Local'});repo.selectEnvironment('w','e')
+  repo.deleteWorkspace('w')
+  expect(repo.list('workspaces')).toHaveLength(0)
+  expect(repo.getSetting('selectedEnvironment:w')).toBeNull()
+})
