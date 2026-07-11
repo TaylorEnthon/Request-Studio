@@ -29,3 +29,4 @@ yarn-error.log*
 # CodeGraph index (per-project, not source)
 .codegraph/
 .superpowers/
+.worktrees/
