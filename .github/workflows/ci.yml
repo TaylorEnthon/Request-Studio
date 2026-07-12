@@ -23,5 +23,6 @@ jobs:
       - run: npm run smoke:database
       - run: npm run test:media
       - run: npm run smoke:media
+      - run: npm run smoke:streaming
       - run: npm run smoke:electron
       - run: npm test -- src/main/database/database.test.ts

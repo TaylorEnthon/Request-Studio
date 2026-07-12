@@ -3,7 +3,15 @@ import EnvironmentPanel from './EnvironmentPanel'
 import HttpRequestEditor, { type EditableHttpDraft } from './HttpRequestEditor'
 import HttpResponsePanel from './HttpResponsePanel'
 import HistoryPanel from './HistoryPanel'
+import StreamingRequestEditor from './StreamingRequestEditor'
+import StreamHistoryPanel from './StreamHistoryPanel'
 import { httpRequestDraftSchema } from '../shared/schemas/http'
+import {
+  defaultSseConfig,
+  defaultWebSocketConfig,
+  sseDraftSchema,
+  webSocketDraftSchema,
+} from '../shared/streaming/streaming-schemas'
 
 type RequestRow = {
   id: string
@@ -17,6 +25,7 @@ type RequestRow = {
   auth_json?: string
   body_json?: string
   settings_json?: string
+  stream_config_json?: string
 }
 const api = () => window.requestStudio,
   parse = (value: string | undefined, fallback: any) => {
@@ -38,6 +47,18 @@ const asDraft = (row: RequestRow, workspaceId: string): EditableHttpDraft => ({
   body: parse(row.body_json, { type: 'none' }),
   settings: parse(row.settings_json, { timeoutMs: 30000 }),
 })
+const asStreamDraft = (row: RequestRow, workspaceId: string) => ({
+  savedRequestId: row.id,
+  workspaceId,
+  name: row.name,
+  url: row.url,
+  params: parse(row.params_json, []),
+  headers: parse(row.headers_json, []),
+  auth: parse(row.auth_json, { type: 'none' }),
+  ...(row.protocol === 'websocket'
+    ? { ...defaultWebSocketConfig, ...parse(row.stream_config_json, {}) }
+    : { ...defaultSseConfig, ...parse(row.stream_config_json, {}) }),
+})
 
 export default function App() {
   const [workspaces, setWorkspaces] = useState<any[]>([]),
@@ -50,10 +71,16 @@ export default function App() {
     [showEnv, setShowEnv] = useState(false),
     [showSettings, setShowSettings] = useState(false),
     [showHistory, setShowHistory] = useState(false),
+    [showStreamHistory, setShowStreamHistory] = useState(false),
     [executionId, setExecutionId] = useState(''),
     [executionState, setExecutionState] = useState('idle'),
     [response, setResponse] = useState<any>(null),
     [executionError, setExecutionError] = useState('')
+  const [streamDraft, setStreamDraft] = useState<any>(null),
+    [streamState, setStreamState] = useState('closed'),
+    [connectionId, setConnectionId] = useState(''),
+    [streamRecords, setStreamRecords] = useState<any[]>([]),
+    [streamError, setStreamError] = useState('')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const load = async () => {
     if (!window.requestStudio) return
@@ -77,8 +104,26 @@ export default function App() {
   }, [workspace])
   useEffect(() => {
     if (selected?.protocol === 'http') setDraft(asDraft(selected, workspace))
-    else setDraft(null)
+    else {
+      setDraft(null)
+      setStreamDraft(selected ? asStreamDraft(selected, workspace) : null)
+      setStreamState('closed')
+      setConnectionId('')
+      setStreamRecords([])
+      setStreamError('')
+    }
   }, [selected, workspace])
+  useEffect(() => {
+    if (!window.requestStudio?.streaming) return
+    return api().streaming.onEvent((event: any) => {
+      if (!selected || event.requestId !== selected.id || (connectionId && event.connectionId !== connectionId)) return
+      if (event.connectionId) setConnectionId(event.connectionId)
+      if (event.type === 'lifecycle') {
+        setStreamState(event.state)
+        if (event.state === 'failed') setStreamError(event.reason || 'Streaming request failed.')
+      } else setStreamRecords((v) => [...v, event.record])
+    })
+  }, [selected, connectionId])
   useEffect(() => {
     if (!window.requestStudio?.http) return
     return api().http.onExecutionEvent((event: any) => {
@@ -179,6 +224,62 @@ export default function App() {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => void saveDraft(next), 350)
   }
+  const saveStream = async (current: any) => {
+    setStatus('Saving…')
+    const result = await api().savedRequests.update({ id: current.savedRequestId, ...current })
+    setStatus(result.ok ? 'Saved' : 'Save failed')
+    return result
+  }
+  const changeStream = (next: any) => {
+    setStreamDraft(next)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => void saveStream(next), 350)
+  }
+  const connectStream = async () => {
+    if (!streamDraft || !selected) return
+    setStreamError('')
+    setStreamRecords([])
+    setConnectionId('')
+    setStreamState('validating')
+    const schema = selected.protocol === 'websocket' ? webSocketDraftSchema : sseDraftSchema,
+      result = schema.safeParse(streamDraft)
+    if (!result.success) {
+      setStreamState('failed')
+      setStreamError(result.error.issues[0]?.message || 'Invalid streaming request.')
+      return
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    const saved = await saveStream(result.data)
+    if (!saved.ok) {
+      setStreamState('failed')
+      setStreamError(saved.error.message)
+      return
+    }
+    setStreamState(selected.protocol === 'websocket' ? 'connecting' : 'streaming')
+    const started = await api()[selected.protocol].connect(result.data)
+    if (started.ok) setConnectionId(started.data.connectionId)
+    else {
+      setStreamState('failed')
+      setStreamError(started.error.message)
+    }
+  }
+  const stopStream = async () => {
+    if (!connectionId || !selected) return
+    setStreamState(selected.protocol === 'websocket' ? 'closing' : 'stopping')
+    await api()[selected.protocol][selected.protocol === 'websocket' ? 'disconnect' : 'stop'](connectionId)
+  }
+  const sendStream = async (kind: string, value: string) => {
+    if (!connectionId) return
+    const result =
+      kind === 'text'
+        ? await api().websocket.sendText(connectionId, value)
+        : kind === 'json'
+          ? await api().websocket.sendJson(connectionId, value)
+          : kind === 'file'
+            ? await api().websocket.sendFile(connectionId, value)
+            : await api().websocket.sendBinary(connectionId, value)
+    if (!result.ok) setStreamError(result.error.message)
+  }
   const send = async () => {
     if (!draft || executionId) return
     setExecutionState('validating')
@@ -232,7 +333,10 @@ export default function App() {
         <span className="spacer" />
         <span>{status}</span>
         <button onClick={() => setShowHistory(true)} disabled={!workspace}>
-          History
+          HTTP History
+        </button>
+        <button onClick={() => setShowStreamHistory(true)} disabled={!workspace}>
+          Stream History
         </button>
         <button onClick={() => setShowEnv(true)}>Environment</button>
         <button onClick={() => setShowSettings(true)}>Settings</button>
@@ -296,8 +400,24 @@ export default function App() {
                 <span>{executionState}</span>
               </div>
             </>
-          ) : selected ? (
-            <div className="empty">HTTP execution is only available for HTTP requests.</div>
+          ) : selected && streamDraft ? (
+            <>
+              <StreamingRequestEditor
+                protocol={selected.protocol as 'websocket' | 'sse'}
+                draft={streamDraft}
+                state={streamState}
+                records={streamRecords}
+                onChange={changeStream}
+                onConnect={connectStream}
+                onStop={stopStream}
+                onSend={sendStream}
+              />
+              {streamError && (
+                <p className="error" role="alert">
+                  {streamError}
+                </p>
+              )}
+            </>
           ) : (
             <div className="empty">
               <h2>Create or select a request</h2>
@@ -320,9 +440,14 @@ export default function App() {
           collectionId={collections[0]?.id || ''}
           onClose={() => setShowHistory(false)}
           onCreated={loadWorkspace}
-          onRerun={(id) => { setExecutionId(id);setExecutionState('sending');setShowHistory(false) }}
+          onRerun={(id) => {
+            setExecutionId(id)
+            setExecutionState('sending')
+            setShowHistory(false)
+          }}
         />
       )}
+      {showStreamHistory && <StreamHistoryPanel workspaceId={workspace} onClose={() => setShowStreamHistory(false)} />}
     </div>
   )
 }
