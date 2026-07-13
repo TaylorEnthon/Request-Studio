@@ -18,3 +18,12 @@
 ## Verification
 
 Use `npm run test:all`, `npm run smoke:database`, `npm run smoke:media`, `npm run smoke:streaming`, and `npm run smoke:electron` from the repository root.
+
+## Final Main Closure
+
+- PR #1 was squash merged into `main` on 2026-07-13 at 00:58:56 UTC.
+- The merged Milestone 4 commit is `0e1f83d50f01b40ce26fcd69f4a9e8a72819b222`; local `main` and `origin/main` were synchronized at this commit before this closure note.
+- Main CI Run `29216443133`, Job `86713192321`, completed successfully on `windows-latest` with Node.js 22 in 2 minutes 10 seconds. All install, lint, typecheck, test, build, database, media, streaming, Electron, and post-Electron database steps succeeded.
+- Final local validation used a clean `npm ci` and passed lint, typecheck, 28 test files / 91 tests, production build, `test:all`, database smoke, media smoke, streaming smoke 4/4, Electron smoke, Node ABI restoration, and `git diff --check`.
+- The temporary `codex/milestone-4-streaming` local branch, remote branch, and `.worktrees/codex-milestone-4-streaming` worktree were removed after merge verification; only the main worktree remains.
+- This documentation commit records the final closure. Milestone 4 is officially closed; no Milestone 5 functionality was added.
