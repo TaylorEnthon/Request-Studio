@@ -145,8 +145,8 @@ export function tokenizeCurl(input: string, requestedDialect: CurlDialectOption 
       }
     }
 
-    const active = quote === null || (dialect === 'posix' && quote === '"')
-    if (active && character === '$' && next === '(') unsafe(position)
+    const substitutionActive = dialect !== 'cmd' && quote !== "'"
+    if (substitutionActive && character === '$' && next === '(') unsafe(position)
     if (dialect === 'posix' && quote !== "'" && character === '`') unsafe(position)
     if (quote === null && '|&;<>'.includes(character)) unsafe(position)
 
