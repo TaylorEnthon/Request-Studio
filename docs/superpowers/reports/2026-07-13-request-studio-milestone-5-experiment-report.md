@@ -8,7 +8,10 @@ Milestone 5 delivers a local Experiment workspace and a bounded two-Run comparis
 
 - Feature branch: `codex/milestone-5-experiment`
 - Base commit: `0f2e9135fd5e80584e81fcc3d4cdca522eb0caf9`
-- Delivery commit, PR, merge commit, and final `main` SHA are recorded in the Final Main Closure section after remote verification.
+- Delivery commit: `dde9d92bcfceff3a12104fb5784b9d860e30f026`
+- Pull request: `#2` (`codex/milestone-5-experiment` → `main`)
+- Squash merge commit: `517c5d7c36d46ddd16d041afa67e264a74fb858c`
+- Final documentation closure SHA is verified after this report update is pushed.
 - Generated output, local databases, logs, user data, stream assets, Experiment resources, `.codegraph`, `.ocr-results`, `.env`, and secrets are excluded from the commit.
 
 ## 3. CodeGraph
@@ -87,7 +90,12 @@ The first sandboxed Electron smoke attempt reached the native `better-sqlite3` r
 
 ## 12. CI
 
-PR and final `main` workflow identifiers, job identifiers, commit SHAs, duration, conclusion, and critical-step status are recorded after the remote runs complete. The repository CI workflow runs `npm ci`, lint, typecheck, tests, build, database smoke, media tests and smoke, streaming smoke, Electron smoke, and the focused database test without `continue-on-error`.
+The repository `CI` workflow runs `npm ci`, lint, typecheck, tests, build, database smoke, media tests and smoke, streaming smoke, Electron smoke, and the focused database test without `continue-on-error`.
+
+- PR CI: Run `29405505186`, Job `87319851502`, commit `dde9d92bcfceff3a12104fb5784b9d860e30f026`, duration 2m16s, conclusion `success`.
+- Merged-feature main CI: Run `29405708256`, Job `87320509006`, commit `517c5d7c36d46ddd16d041afa67e264a74fb858c`, duration 3m7s, conclusion `success`.
+- Every critical step completed with `success`; no critical step was skipped and the workflow does not use `continue-on-error`.
+- The final documentation closure commit receives a separate main CI run and is the final remote gate for official closure.
 
 ## 13. Known Limits and Scope
 
@@ -101,4 +109,4 @@ Start the next milestone only from a separately reviewed specification after Mil
 
 ## Final Main Closure
 
-Pending PR merge and final `main` CI verification.
+PR #2 was squash-merged into `main` on 2026-07-15. The feature merge and its main CI are complete. Official closure is declared only after the documentation closure commit is pushed, its main CI succeeds, local `main` is synchronized to `origin/main`, ahead/behind is `0/0`, and the working tree is clean.
