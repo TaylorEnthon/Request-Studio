@@ -12,7 +12,7 @@ export interface ResponseClassification {
 export interface ResponseResourceDescriptor {
   id: string
   historyId: string
-  source: 'managed-response-file' | 'base64-extraction' | 'stream-record'
+  source: 'managed-response-file' | 'base64-extraction' | 'stream-record' | 'experiment-response'
   kind: Exclude<ResponseBodyKind, 'empty' | 'json' | 'text' | 'html' | 'xml'>
   declaredMimeType: string | null
   detectedMimeType: string | null

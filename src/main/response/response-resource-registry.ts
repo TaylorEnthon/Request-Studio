@@ -81,6 +81,17 @@ export class ResponseResourceRegistry {
       } catch {
         /* missing managed file stays unavailable */
       }
+    for (const row of this.db.prepare('SELECT * FROM experiment_resources').all() as any[])
+      try {
+        await this.register({
+          historyId: row.run_id, source: 'experiment-response', kind: row.kind,
+          declaredMimeType: row.declared_mime_type, detectedMimeType: row.detected_mime_type,
+          effectiveMimeType: row.effective_mime_type, byteLength: row.byte_length,
+          suggestedFilename: row.suggested_filename, warnings: JSON.parse(row.warnings_json), path: row.path,
+        }, row.id, row.digest, false)
+      } catch {
+        /* missing Experiment asset stays unavailable */
+      }
   }
   async cleanupOrphans() {
     if (!this.db) return
@@ -88,12 +99,18 @@ export class ResponseResourceRegistry {
       (this.db.prepare('SELECT id FROM request_history').all() as { id: string }[]).map((v) => v.id),
     )
     for (const row of this.db.prepare('SELECT id FROM stream_sessions').all() as { id: string }[]) valid.add(row.id)
+    const experiments = new Set((this.db.prepare('SELECT id FROM experiments').all() as { id: string }[]).map((row) => row.id))
+    const runs = new Set((this.db.prepare('SELECT id FROM experiment_runs').all() as { id: string }[]).map((row) => row.id))
     for (const root of this.roots)
       for (const workspace of await readdir(root, { withFileTypes: true }).catch(() => []))
         if (workspace.isDirectory())
-          for (const history of await readdir(resolve(root, workspace.name), { withFileTypes: true }).catch(() => []))
-            if (history.isDirectory() && !valid.has(history.name))
-              await rm(resolve(root, workspace.name, history.name), { recursive: true, force: true })
+          for (const item of await readdir(resolve(root, workspace.name), { withFileTypes: true }).catch(() => []))
+            if (item.isDirectory() && !valid.has(item.name)) {
+              const itemPath = resolve(root, workspace.name, item.name)
+              if (!experiments.has(item.name)) await rm(itemPath, { recursive: true, force: true })
+              else for (const run of await readdir(itemPath, { withFileTypes: true }).catch(() => []))
+                if (run.isDirectory() && !runs.has(run.name)) await rm(resolve(itemPath, run.name), { recursive: true, force: true })
+            }
   }
   getRecord(id: string) {
     const value = this.records.get(id)
