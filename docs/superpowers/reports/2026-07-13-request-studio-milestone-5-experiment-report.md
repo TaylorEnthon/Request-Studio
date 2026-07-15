@@ -11,7 +11,7 @@ Milestone 5 delivers a local Experiment workspace and a bounded two-Run comparis
 - Delivery commit: `dde9d92bcfceff3a12104fb5784b9d860e30f026`
 - Pull request: `#2` (`codex/milestone-5-experiment` → `main`)
 - Squash merge commit: `517c5d7c36d46ddd16d041afa67e264a74fb858c`
-- Final documentation closure SHA is verified after this report update is pushed.
+- Final documentation closure commit: `5f4ee00a15008dd1b08efeb04ecbb1c660124c7a`
 - Generated output, local databases, logs, user data, stream assets, Experiment resources, `.codegraph`, `.ocr-results`, `.env`, and secrets are excluded from the commit.
 
 ## 3. CodeGraph
@@ -95,7 +95,7 @@ The repository `CI` workflow runs `npm ci`, lint, typecheck, tests, build, datab
 - PR CI: Run `29405505186`, Job `87319851502`, commit `dde9d92bcfceff3a12104fb5784b9d860e30f026`, duration 2m16s, conclusion `success`.
 - Merged-feature main CI: Run `29405708256`, Job `87320509006`, commit `517c5d7c36d46ddd16d041afa67e264a74fb858c`, duration 3m7s, conclusion `success`.
 - Every critical step completed with `success`; no critical step was skipped and the workflow does not use `continue-on-error`.
-- The final documentation closure commit receives a separate main CI run and is the final remote gate for official closure.
+- Final documentation main CI: Run `29406008767`, Job `87321518898`, commit `5f4ee00a15008dd1b08efeb04ecbb1c660124c7a`, duration 2m14s, conclusion `success`.
 
 ## 13. Known Limits and Scope
 
@@ -109,4 +109,8 @@ Start the next milestone only from a separately reviewed specification after Mil
 
 ## Final Main Closure
 
-PR #2 was squash-merged into `main` on 2026-07-15. The feature merge and its main CI are complete. Official closure is declared only after the documentation closure commit is pushed, its main CI succeeds, local `main` is synchronized to `origin/main`, ahead/behind is `0/0`, and the working tree is clean.
+PR #2 was squash-merged into `main` on 2026-07-15 as `517c5d7c36d46ddd16d041afa67e264a74fb858c`. Fresh local validation passed lint, typecheck, 34 test files / 122 tests, build, database smoke, media smoke, streaming smoke, Electron smoke, and `git diff --check`.
+
+The documentation closure commit `5f4ee00a15008dd1b08efeb04ecbb1c660124c7a` was pushed to `main`; its CI Run `29406008767` / Job `87321518898` completed successfully in 2m14s with every critical step successful. The temporary Milestone 5 worktree, local feature branch, remote feature branch, and stale worktree references were removed without deleting any unmerged branch.
+
+At final closure verification, local `main` and `origin/main` both resolved to `5f4ee00a15008dd1b08efeb04ecbb1c660124c7a`, ahead/behind was `0/0`, and the working tree was clean. Milestone 5 is officially closed.
