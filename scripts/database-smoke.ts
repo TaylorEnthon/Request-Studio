@@ -17,7 +17,7 @@ try {
   db = createDatabase(file)
   repo = new Repository(db)
   if (
-    db.pragma('user_version', { simple: true }) !== 4 ||
+    db.pragma('user_version', { simple: true }) !== 5 ||
     repo.resolveSelectedEnvironment('w') !== 'e' ||
     repo.list('workspaces').length !== 1
   )

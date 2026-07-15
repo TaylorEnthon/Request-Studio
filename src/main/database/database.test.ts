@@ -8,11 +8,11 @@ import { join } from 'node:path'
 describe('database', () => {
   const open: ReturnType<typeof createDatabase>[] = []
   afterEach(() => open.splice(0).forEach((db) => db.close()))
-  it('migrates once to schema version 1', () => {
+  it('migrates once to schema version 5', () => {
     const db = createDatabase(':memory:')
     open.push(db)
-    expect(db.pragma('user_version', { simple: true })).toBe(4)
-    expect(db.prepare('select count(*) count from schema_migrations').get()).toEqual({ count: 4 })
+    expect(db.pragma('user_version', { simple: true })).toBe(5)
+    expect(db.prepare('select count(*) count from schema_migrations').get()).toEqual({ count: 5 })
   })
   it('cascades workspace data', () => {
     const db = createDatabase(':memory:')
@@ -41,6 +41,20 @@ describe('database', () => {
       db.prepare("select name from pragma_table_info('saved_requests') where name='stream_config_json'").get(),
     ).toEqual({ name: 'stream_config_json' })
   })
+  it('adds experiments with cascading runs, records, and resources', () => {
+    const db = createDatabase(':memory:')
+    open.push(db)
+    for (const name of ['experiments', 'experiment_runs', 'experiment_run_records', 'experiment_resources'])
+      expect(db.prepare("select name from sqlite_master where type='table' and name=?").get(name)).toEqual({ name })
+    db.prepare("insert into workspaces values ('w','Work','2026','2026')").run()
+    db.prepare("insert into experiments values ('e','w','Test','', 'http','2026','2026')").run()
+    db.prepare("insert into experiment_runs(id,experiment_id,label,position,status,snapshot_version,request_snapshot_json,environment_snapshot_json,created_at,updated_at) values ('r','e','Run A',0,'draft',1,'{}','{}','2026','2026')").run()
+    db.prepare("insert into experiment_run_records(id,run_id,sequence,direction,record_type,data_kind,relative_time_ms,byte_length,created_at) values ('record','r',0,'inbound','message','text',0,1,'2026')").run()
+    db.prepare("insert into experiment_resources(id,run_id,source,kind,path,byte_length,suggested_filename,warnings_json,created_at) values ('asset','r','response','binary','managed.bin',1,'response.bin','[]','2026')").run()
+    db.prepare("delete from experiments where id='e'").run()
+    for (const name of ['experiment_runs', 'experiment_run_records', 'experiment_resources'])
+      expect(db.prepare(`select count(*) count from ${name}`).get()).toEqual({ count: 0 })
+  })
   it('upgrades an existing version 1 file without losing saved requests', () => {
     const dir = mkdtempSync(join(tmpdir(), 'request-studio-v1-')),
       file = join(dir, 'v1.db')
@@ -52,7 +66,7 @@ describe('database', () => {
       )
       old.close()
       upgraded = createDatabase(file)
-      expect(upgraded.pragma('user_version', { simple: true })).toBe(4)
+      expect(upgraded.pragma('user_version', { simple: true })).toBe(5)
       expect(
         upgraded.prepare("select name,params_json,stream_config_json from saved_requests where id='r'").get(),
       ).toEqual({ name: 'R', params_json: '[]', stream_config_json: '{}' })

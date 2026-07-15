@@ -27,6 +27,15 @@ CREATE INDEX stream_records_session_sequence_idx ON stream_records(session_id,se
 CREATE TABLE stream_message_templates(id TEXT PRIMARY KEY,saved_request_id TEXT NOT NULL REFERENCES saved_requests(id) ON DELETE CASCADE,name TEXT NOT NULL,kind TEXT NOT NULL,content TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
 CREATE TABLE stream_resources(id TEXT PRIMARY KEY,session_id TEXT NOT NULL REFERENCES stream_sessions(id) ON DELETE CASCADE,record_id TEXT REFERENCES stream_records(id) ON DELETE CASCADE,kind TEXT NOT NULL,mime_type TEXT,path TEXT NOT NULL,byte_length INTEGER NOT NULL,suggested_filename TEXT NOT NULL,warnings_json TEXT NOT NULL DEFAULT '[]',created_at TEXT NOT NULL);
 CREATE INDEX stream_resources_session_idx ON stream_resources(session_id);`
+const schemaV5 = `
+CREATE TABLE experiments(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',protocol TEXT NOT NULL CHECK(protocol IN ('http','websocket','sse')),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(workspace_id,name COLLATE NOCASE));
+CREATE INDEX experiments_workspace_updated_idx ON experiments(workspace_id,updated_at DESC);
+CREATE TABLE experiment_runs(id TEXT PRIMARY KEY,experiment_id TEXT NOT NULL REFERENCES experiments(id) ON DELETE CASCADE,label TEXT NOT NULL,position INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('draft','queued','running','completed','failed','cancelled')),snapshot_version INTEGER NOT NULL DEFAULT 1,request_snapshot_json TEXT NOT NULL,environment_snapshot_json TEXT NOT NULL DEFAULT '{}',result_snapshot_json TEXT,started_at TEXT,completed_at TEXT,duration_ms INTEGER,error_json TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(experiment_id,position),UNIQUE(experiment_id,label COLLATE NOCASE));
+CREATE INDEX experiment_runs_experiment_status_idx ON experiment_runs(experiment_id,status,position);
+CREATE TABLE experiment_run_records(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES experiment_runs(id) ON DELETE CASCADE,sequence INTEGER NOT NULL,direction TEXT NOT NULL,record_type TEXT NOT NULL,data_kind TEXT NOT NULL,relative_time_ms INTEGER NOT NULL,byte_length INTEGER NOT NULL,text_preview TEXT,json_text TEXT,event_name TEXT,event_id TEXT,retry_ms INTEGER,outcome TEXT,resource_id TEXT,created_at TEXT NOT NULL,UNIQUE(run_id,sequence));
+CREATE INDEX experiment_run_records_run_sequence_idx ON experiment_run_records(run_id,sequence);
+CREATE TABLE experiment_resources(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES experiment_runs(id) ON DELETE CASCADE,source TEXT NOT NULL,kind TEXT NOT NULL,declared_mime_type TEXT,detected_mime_type TEXT,effective_mime_type TEXT,path TEXT NOT NULL,byte_length INTEGER NOT NULL,suggested_filename TEXT NOT NULL,warnings_json TEXT NOT NULL DEFAULT '[]',digest TEXT,created_at TEXT NOT NULL);
+CREATE INDEX experiment_resources_run_idx ON experiment_resources(run_id);`
 
 export function createDatabase(path: string): Database.Database {
   const db = new Database(path)
@@ -54,6 +63,12 @@ export function createDatabase(path: string): Database.Database {
       db.exec(schemaV4)
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(4,?)').run(new Date().toISOString())
       db.pragma('user_version = 4')
+    })()
+  if (Number(db.pragma('user_version', { simple: true })) < 5)
+    db.transaction(() => {
+      db.exec(schemaV5)
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(5,?)').run(new Date().toISOString())
+      db.pragma('user_version = 5')
     })()
   return db
 }

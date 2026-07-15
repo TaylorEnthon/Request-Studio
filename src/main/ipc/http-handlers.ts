@@ -131,6 +131,7 @@ export function registerHttpHandlers(db: Database.Database, responseDir: string,
   })
   return {
     cancelAll: () => service.cancelAll(),
+    service,
     resources,
     files,
     cleanupWorkspace: (workspaceId: string) => history.clear(workspaceId),

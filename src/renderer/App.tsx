@@ -5,6 +5,7 @@ import HttpResponsePanel from './HttpResponsePanel'
 import HistoryPanel from './HistoryPanel'
 import StreamingRequestEditor from './StreamingRequestEditor'
 import StreamHistoryPanel from './StreamHistoryPanel'
+import ExperimentWorkspace from './ExperimentWorkspace'
 import { httpRequestDraftSchema } from '../shared/schemas/http'
 import {
   defaultSseConfig,
@@ -65,7 +66,9 @@ export default function App() {
     [workspace, setWorkspace] = useState(''),
     [collections, setCollections] = useState<any[]>([]),
     [requests, setRequests] = useState<RequestRow[]>([]),
+    [experiments, setExperiments] = useState<any[]>([]),
     [selected, setSelected] = useState<RequestRow | null>(null),
+    [selectedExperimentId, setSelectedExperimentId] = useState(''),
     [draft, setDraft] = useState<EditableHttpDraft | null>(null),
     [status, setStatus] = useState('Saved'),
     [showEnv, setShowEnv] = useState(false),
@@ -92,9 +95,10 @@ export default function App() {
   }
   const loadWorkspace = async () => {
     if (!workspace) return
-    const [c, r] = await Promise.all([api().collections.list(workspace), api().savedRequests.list(workspace)])
+    const [c, r, e] = await Promise.all([api().collections.list(workspace), api().savedRequests.list(workspace), api().experiments?.list({ workspaceId: workspace, limit: 25, offset: 0 }) ?? Promise.resolve({ok:true,data:[]})])
     if (c.ok) setCollections(c.data)
     if (r.ok) setRequests(r.data)
+    if (e.ok) setExperiments(e.data)
   }
   useEffect(() => {
     void load()
@@ -212,6 +216,13 @@ export default function App() {
       if (selected?.id === r.id) setSelected(null)
       void loadWorkspace()
     }
+  }
+  const createExperiment = async () => {
+    if (!workspace || !selected) return
+    const name = prompt('Experiment name', `${selected.name} Experiment`)?.trim()
+    if (!name) return
+    const result = await api().experiments.create({ workspaceId: workspace, savedRequestId: selected.id, name })
+    if (result.ok) { await loadWorkspace(); setSelected(null); setSelectedExperimentId(result.data.id) }
   }
   const saveDraft = async (current: EditableHttpDraft) => {
     setStatus('Saving…')
@@ -358,16 +369,26 @@ export default function App() {
           </div>
           {requests.map((r) => (
             <div className="entity" key={r.id}>
-              <button className="request" onClick={() => setSelected(r)}>
+              <button className="request" onClick={() => { setSelectedExperimentId(''); setSelected(r) }}>
                 {r.protocol.toUpperCase()} · {r.name}
               </button>
               <button onClick={() => duplicateRequest(r)}>⧉</button>
               <button onClick={() => deleteRequest(r)}>×</button>
             </div>
           ))}
+          <div className="pane-title">
+            Experiments <button aria-label="New Experiment" disabled={!selected} onClick={createExperiment}>+</button>
+          </div>
+          {experiments.map((experiment) => (
+            <div className="entity" key={experiment.id}>
+              <button className="request" onClick={() => { setSelected(null); setSelectedExperimentId(experiment.id) }}>
+                {String(experiment.protocol).toUpperCase()} · {experiment.name} · {experiment.run_count} {experiment.run_count === 1 ? 'Run' : 'Runs'}
+              </button>
+            </div>
+          ))}
         </nav>
-        <main>
-          {draft ? (
+        <main className={selectedExperimentId ? 'experiment-main' : ''}>
+          {selectedExperimentId ? <ExperimentWorkspace workspaceId={workspace} experimentId={selectedExperimentId} onDeleted={() => { setSelectedExperimentId(''); void loadWorkspace() }} /> : draft ? (
             <>
               <label>
                 Name
@@ -424,7 +445,7 @@ export default function App() {
             </div>
           )}
         </main>
-        <HttpResponsePanel response={response} error={executionError} />
+        {!selectedExperimentId && <HttpResponsePanel response={response} error={executionError} />}
       </div>
       {showEnv && <EnvironmentPanel workspaceId={workspace} onClose={() => setShowEnv(false)} />}{' '}
       {showSettings && (

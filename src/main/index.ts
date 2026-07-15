@@ -10,6 +10,8 @@ import { savedRequestHttpUpdateSchema } from '../shared/schemas/http'
 import { createResourceResponse } from './response/response-resource-protocol'
 import { registerStreamingHandlers } from './ipc/streaming-handlers'
 import { savedSseUpdateSchema, savedWebSocketUpdateSchema } from '../shared/streaming/streaming-schemas'
+import { registerExperimentHandlers } from './ipc/experiment-handlers'
+import { ExperimentRunner } from './experiments/experiment-runner'
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'request-studio-resource',
@@ -19,7 +21,8 @@ protocol.registerSchemesAsPrivileged([
 
 let db: ReturnType<typeof createDatabase>,
   httpService: ReturnType<typeof registerHttpHandlers>,
-  streamService: ReturnType<typeof registerStreamingHandlers>
+  streamService: ReturnType<typeof registerStreamingHandlers>,
+  experimentService: ExperimentRunner
 const tableByDomain: Record<string, string> = {
   workspaces: 'workspaces',
   collections: 'collections',
@@ -193,6 +196,7 @@ function registerIpc(repo: Repository) {
       if (domain === 'workspaces') {
         httpService?.cleanupWorkspace(checked.id)
         streamService?.cleanupWorkspace(checked.id)
+        void experimentService?.cleanupWorkspace(checked.id)
         repo.deleteWorkspace(checked.id)
       } else repo.delete(table, checked.id)
       return { ok: true, data: null }
@@ -244,15 +248,18 @@ app
   .whenReady()
   .then(() => {
     const userData = app.getPath('userData'),
-      streamAssets = path.join(userData, 'stream-assets')
+      streamAssets = path.join(userData, 'stream-assets'),
+      experimentAssets = path.join(userData, 'experiment-assets')
     db = createDatabase(path.join(userData, 'request-studio.db'))
     registerIpc(new Repository(db))
-    httpService = registerHttpHandlers(db, path.join(userData, 'history-assets'), [streamAssets])
+    httpService = registerHttpHandlers(db, path.join(userData, 'history-assets'), [streamAssets, experimentAssets])
     streamService = registerStreamingHandlers(db, {
       assetRoot: streamAssets,
       resources: httpService.resources,
       resolveFile: (ref) => httpService.files.read(ref),
     })
+    experimentService = new ExperimentRunner(db, httpService.service, httpService.resources, experimentAssets, streamService.ws, streamService.sse)
+    registerExperimentHandlers(db, experimentService)
     protocol.handle('request-studio-resource', (request) => createResourceResponse(httpService.resources, request))
     const window = createWindow()
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))

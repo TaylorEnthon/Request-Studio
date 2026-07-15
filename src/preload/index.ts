@@ -37,6 +37,23 @@ contextBridge.exposeInMainWorld('requestStudio', {
     delete: (input: unknown) => invoke('requests:delete', input),
     duplicate: (input: unknown) => invoke('requests:duplicate', input),
   },
+  experiments: {
+    list: (input: unknown) => invoke('experiments:list', input),
+    get: (input: unknown) => invoke('experiments:get', input),
+    create: (input: unknown) => invoke('experiments:create', input),
+    rename: (input: unknown) => invoke('experiments:rename', input),
+    duplicate: (input: unknown) => invoke('experiments:duplicate', input),
+    delete: (input: unknown) => invoke('experiments:delete', input),
+  },
+  experimentRuns: {
+    create: (input: unknown) => invoke('experiment-runs:create', input),
+    update: (input: unknown) => invoke('experiment-runs:update', input),
+    delete: (input: unknown) => invoke('experiment-runs:delete', input),
+    execute: (input: unknown) => invoke('experiment-runs:execute', input),
+    cancel: (input: unknown) => invoke('experiment-runs:cancel', input),
+    send: (input: unknown) => invoke('experiment-runs:send', input),
+    compareData: (input: unknown) => invoke('experiment-runs:compare-data', input),
+  },
   http: {
     execute: (input: unknown) => invoke('http:execute', input),
     cancel: (executionId: string) => invoke('http:cancel', { executionId }),

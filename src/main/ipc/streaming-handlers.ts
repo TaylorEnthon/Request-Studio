@@ -237,6 +237,8 @@ export function registerStreamingHandlers(
     return { ok: true, data: null }
   })
   return {
+    ws,
+    sse,
     disconnectAll: () => {
       ws.disconnectAll()
       sse.stopAll()
