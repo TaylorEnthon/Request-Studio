@@ -41,7 +41,7 @@ No new repository class, service class, dependency, schema, or thin re-export fi
 - optional `environmentId`;
 - one variable mapping for each sensitive preview placeholder.
 
-Each variable mapping contains only `placeholder` and `variableName`. It has no value field. Variable names use the existing placeholder-compatible grammar `[A-Za-z_][A-Za-z0-9_.-]*` and a 100-character maximum.
+Each variable mapping contains only `placeholder` and `variableName`. It has no value field. Variable names use the runtime resolver's placeholder grammar `[A-Za-z_][A-Za-z0-9_]*` and a 100-character maximum.
 
 `mapCurlImportSave` validates that:
 
