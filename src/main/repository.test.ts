@@ -1,9 +1,23 @@
 import { afterEach, expect, it } from 'vitest'
+import { mapCurlImportSave } from '../shared/curl/curl-import-save'
+import { previewCurlImport } from '../shared/curl/curl-import-preview'
 import { createDatabase } from './database/database'
 import { Repository } from './repository'
 
 const databases: ReturnType<typeof createDatabase>[] = []
 afterEach(() => databases.splice(0).forEach((db) => db.close()))
+
+const setupCurlImport = () => {
+  const db=createDatabase(':memory:');databases.push(db);const repo=new Repository(db)
+  repo.create('workspaces',{id:'w',name:'Workspace'});repo.create('workspaces',{id:'other',name:'Other'})
+  repo.create('collections',{id:'c',workspace_id:'w',name:'API'});repo.create('collections',{id:'other-c',workspace_id:'other',name:'Other API'})
+  repo.create('environments',{id:'e',workspace_id:'w',name:'Local'});repo.create('environments',{id:'other-e',workspace_id:'other',name:'Other Local'})
+  const result=previewCurlImport('curl -H "Authorization: Bearer credential-fixture" https://example.com')
+  if(!result.ok)throw new Error('Expected preview')
+  const plan=mapCurlImportSave({preview:result.preview,workspaceId:'w',collectionId:'c',environmentId:'e',name:'Imported',variableMappings:[{placeholder:'{{TOKEN}}',variableName:'SERVICE_TOKEN'}]})
+  return {db,repo,plan}
+}
+
 it('creates, updates, lists, and deletes a workspace', () => {
   const db=createDatabase(':memory:');databases.push(db);const repo=new Repository(db)
   const created=repo.create('workspaces',{name:'One'}) as {id:string}
@@ -43,4 +57,34 @@ it('deletes workspace data and its selected environment setting together', () =>
   repo.deleteWorkspace('w')
   expect(repo.list('workspaces')).toHaveLength(0)
   expect(repo.getSetting('selectedEnvironment:w')).toBeNull()
+})
+
+it('imports a cURL plan atomically through scoped repositories', () => {
+  const {db,repo,plan}=setupCurlImport()
+  const result=repo.importCurl(plan) as any
+  expect(result.request).toMatchObject({workspace_id:'w',collection_id:'c',name:'Imported',protocol:'http'})
+  expect(JSON.parse(result.request.auth_json)).toEqual({type:'bearer',token:'{{SERVICE_TOKEN}}'})
+  expect(result.variables).toEqual([expect.objectContaining({environment_id:'e',key:'SERVICE_TOKEN',value:'',is_secret:1})])
+  expect(JSON.stringify(db.prepare('SELECT * FROM saved_requests').all())).not.toContain('credential-fixture')
+  expect(JSON.stringify(db.prepare('SELECT * FROM environment_variables').all())).not.toContain('credential-fixture')
+})
+
+it('rejects cross-workspace collection and Environment ownership', () => {
+  const {repo,plan}=setupCurlImport()
+  expect(()=>repo.importCurl({...plan,collectionId:'other-c'})).toThrow('Collection not found in workspace.')
+  expect(()=>repo.importCurl({...plan,variables:plan.variables.map(value=>({...value,environmentId:'other-e'}))})).toThrow('Environment not found in workspace.')
+})
+
+it('leaves no Saved Request when variable creation fails', () => {
+  const {db,repo,plan}=setupCurlImport()
+  repo.create('environment_variables',{environment_id:'e',key:'SERVICE_TOKEN',value:'',is_secret:1,description:''})
+  expect(()=>repo.importCurl(plan)).toThrow('cURL import could not be saved.')
+  expect(db.prepare('SELECT * FROM saved_requests').all()).toHaveLength(0)
+})
+
+it('rolls back variables when Saved Request creation fails', () => {
+  const {db,repo,plan}=setupCurlImport()
+  db.exec("CREATE TRIGGER reject_curl_import BEFORE INSERT ON saved_requests BEGIN SELECT RAISE(ABORT, 'rejected'); END")
+  expect(()=>repo.importCurl(plan)).toThrow('cURL import could not be saved.')
+  expect(db.prepare('SELECT * FROM environment_variables').all()).toHaveLength(0)
 })

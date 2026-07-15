@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
+import type { CurlImportSavePlan } from '../shared/curl/curl-import-save'
 
 const now = () => new Date().toISOString()
 export class Repository {
@@ -32,6 +33,17 @@ export class Repository {
     const fallback=(this.db.prepare('SELECT id FROM environments WHERE workspace_id=? ORDER BY created_at LIMIT 1').get(workspaceId) as {id:string}|undefined)?.id ?? null
     if (fallback) this.setting(key,fallback); else this.clearSetting(key)
     return fallback
+  }
+  importCurl(plan: CurlImportSavePlan) {
+    if (!this.db.prepare('SELECT 1 FROM collections WHERE id=? AND workspace_id=?').get(plan.collectionId,plan.workspaceId)) throw new Error('Collection not found in workspace.')
+    if (plan.variables.some(value=>!this.db.prepare('SELECT 1 FROM environments WHERE id=? AND workspace_id=?').get(value.environmentId,plan.workspaceId))) throw new Error('Environment not found in workspace.')
+    try {
+      return this.db.transaction(()=>{
+        const variables=plan.variables.map(value=>this.create('environment_variables',{environment_id:value.environmentId,key:value.key,value:'',is_secret:1,description:value.description}))
+        const request=this.create('saved_requests',{workspace_id:plan.workspaceId,collection_id:plan.collectionId,name:plan.name,protocol:'http',method:plan.request.method,url:plan.request.url,description:plan.description,params_json:JSON.stringify(plan.request.params),headers_json:JSON.stringify(plan.request.headers),auth_json:JSON.stringify(plan.request.auth),body_json:JSON.stringify(plan.request.body),settings_json:JSON.stringify(plan.request.settings),stream_config_json:'{}'})
+        return {request,variables}
+      })()
+    } catch { throw new Error('cURL import could not be saved.') }
   }
   deleteWorkspace(id: string) {
     this.db.transaction(()=>{this.clearSetting(`selectedEnvironment:${id}`);this.db.prepare('DELETE FROM workspaces WHERE id=?').run(id)})()
