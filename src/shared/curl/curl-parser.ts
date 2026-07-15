@@ -96,8 +96,10 @@ export function parseCurl(input: string, requestedDialect: CurlDialectOption = '
     const shortFlag = /^-[XHdu]/.test(flag) ? flag.slice(0, 2) : flag
     const shortInline = shortFlag !== flag ? flag.slice(2) : undefined
     const option = shortFlag
-    if (fileFlags.has(option) || fileFlags.has(flag)) {
-      throw new CurlParseError('FILE_REFERENCE', 'File-based cURL options are not supported.', token.start, dialect, option)
+    const attachedFileFlag = /^-[KFTbco]/.exec(flag)?.[0]
+    const fileFlag = attachedFileFlag ?? (fileFlags.has(option) || fileFlags.has(flag) ? option : undefined)
+    if (fileFlag) {
+      throw new CurlParseError('FILE_REFERENCE', 'File-based cURL options are not supported.', token.start, dialect, fileFlag)
     }
 
     if (['-X', '--request', '--url', '-H', '--header', '-d', '--data', '--data-raw', '-u', '--user'].includes(option)) {

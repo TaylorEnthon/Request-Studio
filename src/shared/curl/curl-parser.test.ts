@@ -176,6 +176,12 @@ describe('parseCurl', () => {
     expect(() => parseCurl(input)).toThrow(CurlParseError)
   })
 
+  it('classifies attached short file flags without retaining their values', () => {
+    expect(() => parseCurl('curl -Ffile=@upload.bin https://example.com')).toThrowError(
+      expect.objectContaining({ code: 'FILE_REFERENCE', flag: '-F' }),
+    )
+  })
+
   it('rejects unsupported commands, flags, URLs, and missing values', () => {
     expect(() => parseCurl('wget https://example.com')).toThrowError(expect.objectContaining({ code: 'INVALID_COMMAND' }))
     expect(() => parseCurl('curl --compressed https://example.com')).toThrowError(/option/i)
