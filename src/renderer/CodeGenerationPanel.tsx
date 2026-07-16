@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Language = 'javascript-fetch' | 'python-requests'
 type RequestSummary = { id: string; name: string; protocol: 'http' | 'websocket' | 'sse' }
@@ -22,21 +22,33 @@ export default function CodeGenerationPanel({ workspaceId, requests, initialRequ
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
+  const generation = useRef(0)
 
   const clear = () => {
+    generation.current += 1
     setPreview(null)
+    setBusy(false)
     setError('')
     setStatus('')
   }
   useEffect(() => {
     const next = requests.find((request) => request.id === initialRequestId)?.id ?? requests[0]?.id ?? ''
     if (!requests.some((request) => request.id === requestId) && requestId !== next) {
+      generation.current += 1
       setRequestId(next)
       setPreview(null)
+      setBusy(false)
       setError('')
       setStatus('')
     }
   }, [requests, initialRequestId, requestId])
+  useEffect(() => {
+    generation.current += 1
+    setPreview(null)
+    setBusy(false)
+    setError('')
+    setStatus('')
+  }, [workspaceId])
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -47,16 +59,19 @@ export default function CodeGenerationPanel({ workspaceId, requests, initialRequ
 
   const generate = async () => {
     if (!requestId) return
-    setBusy(true)
     clear()
+    setBusy(true)
+    const current = generation.current
     try {
       const result = await window.requestStudio.codeGeneration.preview({ workspaceId, requestId, language })
+      if (current !== generation.current) return
       if (result.ok) setPreview(result.data)
       else setError(result.error.message)
     } catch {
+      if (current !== generation.current) return
       setError('Code could not be generated.')
     } finally {
-      setBusy(false)
+      if (current === generation.current) setBusy(false)
     }
   }
   const copy = async () => {

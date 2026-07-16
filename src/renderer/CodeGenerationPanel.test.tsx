@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import CodeGenerationPanel from './CodeGenerationPanel'
 
@@ -108,4 +108,26 @@ it('selects a valid request when the request list arrives or removes the current
     <CodeGenerationPanel workspaceId="workspace-id" requests={[requests[1]]} initialRequestId="database-http-id" onClose={onClose} />,
   )
   expect(screen.getByLabelText('Saved Request')).toHaveValue('database-websocket-id')
+})
+
+it('discards a delayed preview after the request selection changes', async () => {
+  let resolvePreview!: (result: any) => void
+  const preview = vi.fn().mockReturnValue(new Promise((resolve) => { resolvePreview = resolve }))
+  window.requestStudio = { codeGeneration: { preview } }
+  render(
+    <CodeGenerationPanel
+      workspaceId="workspace-id"
+      requests={requests}
+      initialRequestId="database-http-id"
+      onClose={vi.fn()}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
+  fireEvent.change(screen.getByLabelText('Saved Request'), {
+    target: { value: 'database-websocket-id' },
+  })
+  await act(async () => resolvePreview({ ok: true, data: generated }))
+  expect(screen.queryByLabelText('Generated code')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
 })
