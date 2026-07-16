@@ -12,6 +12,7 @@ export type CurlErrorCode =
   | 'MISSING_VALUE'
   | 'UNSUPPORTED_FLAG'
   | 'INVALID_HEADER'
+  | 'INVALID_BODY'
   | 'INVALID_URL'
   | 'FILE_REFERENCE'
   | 'MULTIPLE_URLS'

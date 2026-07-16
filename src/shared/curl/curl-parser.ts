@@ -215,7 +215,9 @@ export function parseCurl(input: string, requestedDialect: CurlDialectOption = '
   const contentType = headers.find(({ key }) => /^content-type$/i.test(key))?.value
   let body: Body = { type: 'none' }
   if (data.length) {
-    if (/\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(contentType ?? '')) {
+    const jsonContentType = /\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(contentType ?? '')
+    const trimmedData = joinedData.trimStart()
+    if (jsonContentType || trimmedData.startsWith('{') || trimmedData.startsWith('[')) {
       try {
         const parsed: unknown = JSON.parse(joinedData)
         let changed = false
@@ -231,11 +233,31 @@ export function parseCurl(input: string, requestedDialect: CurlDialectOption = '
           return value
         }
         const sanitized = sanitize(parsed)
-        body = { type: 'json', content: changed ? JSON.stringify(sanitized) : joinedData }
+        const content = changed ? JSON.stringify(sanitized) : joinedData
+        body = jsonContentType ? { type: 'json', content } : { type: 'text', content }
       } catch {
-        body = { type: 'text', content: joinedData, ...(contentType ? { contentType } : {}) }
+        throw new CurlParseError('INVALID_BODY', 'Request JSON data is invalid.', data[0].position, dialect, '-d')
       }
-    } else body = { type: 'text', content: joinedData, ...(contentType ? { contentType } : {}) }
+    } else {
+      const content = joinedData
+        .split('&')
+        .map((part) => {
+          const separator = part.indexOf('=')
+          if (separator < 1) return part
+          const rawKey = part.slice(0, separator)
+          let key = rawKey
+          try {
+            key = decodeURIComponent(rawKey.replaceAll('+', ' '))
+          } catch {
+            // Keep the raw key; malformed encoding remains ordinary text.
+          }
+          return sensitiveKey.test(key)
+            ? `${rawKey}=${record(secretKind(key), data[0].position, placeholderBase(key))}`
+            : part
+        })
+        .join('&')
+      body = { type: 'text', content, ...(contentType ? { contentType } : {}) }
+    }
   }
 
   const warnings: string[] = []

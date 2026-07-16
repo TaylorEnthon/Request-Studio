@@ -37,10 +37,10 @@ const error = (code: string, message: string) => ({
 })
 
 export const registerCurlImportHandlers = (repo: Repository) => {
-  let latest: { id: string; preview: CurlImportPreview } | undefined
+  const previews = new WeakMap<object, { id: string; preview: CurlImportPreview }>()
 
-  ipcMain.handle('curl-import:preview', (_event, input) => {
-    latest = undefined
+  ipcMain.handle('curl-import:preview', (event, input) => {
+    previews.delete(event.sender)
     const checked = validate(previewInputSchema, input)
     if (!checked.ok) return checked
     const result = previewCurlImport(checked.data.source, checked.data.dialect)
@@ -48,13 +48,15 @@ export const registerCurlImportHandlers = (repo: Repository) => {
       const issue = result.issues[0]
       return error(issue?.code ?? 'PREVIEW_FAILED', issue?.message ?? 'The cURL command could not be previewed.')
     }
-    latest = { id: randomUUID(), preview: result.preview }
+    const latest = { id: randomUUID(), preview: result.preview }
+    previews.set(event.sender, latest)
     return { ok: true, data: { previewId: latest.id, preview: latest.preview } }
   })
 
-  ipcMain.handle('curl-import:save', (_event, input) => {
+  ipcMain.handle('curl-import:save', (event, input) => {
     const checked = validate(saveInputSchema, input)
     if (!checked.ok) return checked
+    const latest = previews.get(event.sender)
     if (!latest || latest.id !== checked.data.previewId) {
       return error('PREVIEW_EXPIRED', 'Preview the cURL command again before importing.')
     }
@@ -62,7 +64,7 @@ export const registerCurlImportHandlers = (repo: Repository) => {
       const data = repo.importCurl(
         mapCurlImportSave({ ...checked.data, preview: latest.preview }),
       )
-      latest = undefined
+      previews.delete(event.sender)
       return { ok: true, data }
     } catch {
       return error('IMPORT_FAILED', 'The cURL request could not be imported.')

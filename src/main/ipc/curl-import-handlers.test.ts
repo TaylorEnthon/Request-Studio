@@ -10,6 +10,7 @@ import { registerCurlImportHandlers } from './curl-import-handlers'
 
 const secret = 'fixture-secret-value'
 const source = `curl -H 'Authorization: Bearer ${secret}' https://example.test/items`
+const defaultEvent = { sender: {} }
 
 const setup = () => {
   const db = createDatabase(':memory:'), repo = new Repository(db)
@@ -24,7 +25,7 @@ const setup = () => {
 }
 
 const preview = () =>
-  handlers.get('curl-import:preview')!(null, { source, dialect: 'auto' }) as Promise<any>
+  handlers.get('curl-import:preview')!(defaultEvent, { source, dialect: 'auto' }) as Promise<any>
 
 beforeEach(() => handlers.clear())
 
@@ -44,14 +45,14 @@ it('previews sanitized cURL and imports it once through the existing transaction
     name: 'Imported request',
     variableMappings: [{ placeholder: '{{TOKEN}}', variableName: 'API_TOKEN' }],
   }
-  const saved: any = await handlers.get('curl-import:save')!(null, input)
+  const saved: any = await handlers.get('curl-import:save')!(defaultEvent, input)
   expect(saved.ok).toBe(true)
   expect(saved.data.request.name).toBe('Imported request')
   expect(repo.list('environment_variables', 'environment_id', 'e')).toMatchObject([
     { key: 'API_TOKEN', value: '', is_secret: 1 },
   ])
   expect(JSON.stringify(saved)).not.toContain(secret)
-  expect(await handlers.get('curl-import:save')!(null, input)).toMatchObject({
+  expect(await handlers.get('curl-import:save')!(defaultEvent, input)).toMatchObject({
     ok: false,
     error: { code: 'PREVIEW_EXPIRED' },
   })
@@ -62,14 +63,14 @@ it('previews sanitized cURL and imports it once through the existing transaction
 
 it('returns fixed safe errors for invalid input and parser rejection', async () => {
   const { db } = setup()
-  const invalid: any = await handlers.get('curl-import:preview')!(null, {
+  const invalid: any = await handlers.get('curl-import:preview')!(defaultEvent, {
     source,
     dialect: 'fish',
   })
   expect(invalid).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } })
   expect(JSON.stringify(invalid)).not.toContain(secret)
 
-  const rejected: any = await handlers.get('curl-import:preview')!(null, {
+  const rejected: any = await handlers.get('curl-import:preview')!(defaultEvent, {
     source: 'curl --data @credentials.txt https://example.test',
     dialect: 'auto',
   })
@@ -89,7 +90,7 @@ it('rejects collection and environment ownership mismatches without consuming th
     variableMappings: [{ placeholder: '{{TOKEN}}', variableName: 'API_TOKEN' }],
   }
   expect(
-    await handlers.get('curl-import:save')!(null, {
+    await handlers.get('curl-import:save')!(defaultEvent, {
       ...base,
       workspaceId: 'other',
       collectionId: 'c',
@@ -97,19 +98,39 @@ it('rejects collection and environment ownership mismatches without consuming th
   ).toMatchObject({ ok: false, error: { code: 'IMPORT_FAILED' } })
   expect(repo.list('saved_requests', 'workspace_id', 'w')).toHaveLength(0)
 
-  expect(await handlers.get('curl-import:save')!(null, { ...base, collectionId: 'other-c' })).toMatchObject({
+  expect(await handlers.get('curl-import:save')!(defaultEvent, { ...base, collectionId: 'other-c' })).toMatchObject({
     ok: false,
     error: { code: 'IMPORT_FAILED' },
   })
   expect(repo.list('saved_requests', 'workspace_id', 'w')).toHaveLength(0)
 
   expect(
-    await handlers.get('curl-import:save')!(null, {
+    await handlers.get('curl-import:save')!(defaultEvent, {
       ...base,
       collectionId: 'c',
       environmentId: 'other-e',
     }),
   ).toMatchObject({ ok: false, error: { code: 'IMPORT_FAILED' } })
   expect(repo.list('saved_requests', 'workspace_id', 'w')).toHaveLength(0)
+  db.close()
+})
+
+it('isolates preview capabilities by renderer sender', async () => {
+  const { db } = setup()
+  const firstSender = { sender: {} }, secondSender = { sender: {} }
+  const result: any = await handlers.get('curl-import:preview')!(firstSender, { source, dialect: 'auto' })
+  const input = {
+    previewId: result.data.previewId,
+    workspaceId: 'w',
+    collectionId: 'c',
+    environmentId: 'e',
+    name: 'Imported request',
+    variableMappings: [{ placeholder: '{{TOKEN}}', variableName: 'API_TOKEN' }],
+  }
+  expect(await handlers.get('curl-import:save')!(secondSender, input)).toMatchObject({
+    ok: false,
+    error: { code: 'PREVIEW_EXPIRED' },
+  })
+  expect(await handlers.get('curl-import:save')!(firstSender, input)).toMatchObject({ ok: true })
   db.close()
 })

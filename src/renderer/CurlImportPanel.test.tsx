@@ -118,3 +118,21 @@ it('shows safe errors and closes without saving', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Close' }))
   expect(onClose).toHaveBeenCalledOnce()
 })
+
+it('clears an old preview when a new parse fails', async () => {
+  const parse = vi
+    .fn()
+    .mockResolvedValueOnce({ ok: true, data: previewData })
+    .mockResolvedValueOnce({ ok: false, error: { message: 'Preview failed safely.' } })
+  setup({ curlImport: { preview: parse, save: vi.fn() } })
+  const source = screen.getByLabelText('cURL command')
+  fireEvent.change(source, { target: { value: 'curl https://example.test' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Parse Preview' }))
+  await screen.findByText('Sensitive mapping')
+
+  fireEvent.change(source, { target: { value: 'invalid' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Parse Preview' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Preview failed safely.')
+  expect(screen.queryByText('Sensitive mapping')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
+})

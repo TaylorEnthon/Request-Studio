@@ -102,6 +102,18 @@ describe('cURL import preview', () => {
     expect(JSON.stringify(result)).not.toContain(path)
   })
 
+  it('rejects malformed JSON without returning its sensitive body', () => {
+    const secret = ['malformed', 'json', 'secret'].join('-')
+    const result = previewCurlImport(
+      `curl -H 'Content-Type: application/json' -d '{"password":"${secret}"' https://example.com`,
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      issues: [{ code: 'CURL_INVALID_BODY', message: 'The cURL command contains invalid JSON data.' }],
+    })
+    expect(JSON.stringify(result)).not.toContain(secret)
+  })
+
   it('rejects an unknown dialect before parsing', () => {
     expect(previewCurlImport('curl https://example.com', 'fish')).toEqual({
       ok: false,

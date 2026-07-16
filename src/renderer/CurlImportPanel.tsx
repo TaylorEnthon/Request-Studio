@@ -32,6 +32,8 @@ export default function CurlImportPanel({ workspaceId, collections, onClose, onI
   const parse = async () => {
     setBusy(true)
     setError('')
+    setPreviewState(null)
+    setMappings([])
     try {
       const result = await window.requestStudio.curlImport.preview({
         source: sourceRef.current?.value ?? '',
