@@ -13,6 +13,7 @@ import { savedSseUpdateSchema, savedWebSocketUpdateSchema } from '../shared/stre
 import { registerExperimentHandlers } from './ipc/experiment-handlers'
 import { ExperimentRunner } from './experiments/experiment-runner'
 import { registerCurlImportHandlers } from './ipc/curl-import-handlers'
+import { registerRequestExportHandlers } from './ipc/request-export-handlers'
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'request-studio-resource',
@@ -255,6 +256,7 @@ app
     const repo = new Repository(db)
     registerIpc(repo)
     registerCurlImportHandlers(repo)
+    registerRequestExportHandlers(repo, userData)
     httpService = registerHttpHandlers(db, path.join(userData, 'history-assets'), [streamAssets, experimentAssets])
     streamService = registerStreamingHandlers(db, {
       assetRoot: streamAssets,

@@ -34,6 +34,9 @@ export class Repository {
     if (fallback) this.setting(key,fallback); else this.clearSetting(key)
     return fallback
   }
+  getSavedRequestForExport(id: string, workspaceId: string) {
+    return this.db.prepare('SELECT * FROM saved_requests WHERE id=? AND workspace_id=?').get(id, workspaceId)
+  }
   importCurl(plan: CurlImportSavePlan) {
     if (!this.db.prepare('SELECT 1 FROM collections WHERE id=? AND workspace_id=?').get(plan.collectionId,plan.workspaceId)) throw new Error('Collection not found in workspace.')
     if (plan.variables.some(value=>!this.db.prepare('SELECT 1 FROM environments WHERE id=? AND workspace_id=?').get(value.environmentId,plan.workspaceId))) throw new Error('Environment not found in workspace.')

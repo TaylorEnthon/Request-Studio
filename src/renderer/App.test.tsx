@@ -47,3 +47,27 @@ it('opens cURL Import from the Tools menu for the selected workspace', async () 
   expect(screen.getByRole('heading', { name: 'Import cURL' })).toBeInTheDocument()
   expect(screen.getByRole('dialog')).toBeInTheDocument()
 })
+
+it('opens and closes Request Export from the Tools menu', async () => {
+  window.requestStudio = {
+    workspaces: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'w', name: 'Workspace' }] }) },
+    collections: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'c', name: 'API' }] }) },
+    savedRequests: {
+      list: vi.fn().mockResolvedValue({
+        ok: true,
+        data: [{ id: 'request-id', name: 'Users', protocol: 'http', method: 'GET', url: '', description: '' }],
+      }),
+    },
+    experiments: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    requestExport: { preview: vi.fn(), save: vi.fn() },
+    streaming: { onEvent: vi.fn() },
+    http: { onExecutionEvent: vi.fn() },
+  }
+  render(<App />)
+  await screen.findByText('API')
+  fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Export Request...' }))
+  expect(screen.getByRole('dialog', { name: 'Export Request' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+  expect(screen.queryByRole('dialog', { name: 'Export Request' })).not.toBeInTheDocument()
+})
