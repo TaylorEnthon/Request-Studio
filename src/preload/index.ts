@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld('requestStudio', {
     preview: (input: unknown) => invoke('request-export:preview', input),
     save: (previewId: string) => invoke('request-export:save', { previewId }),
   },
+  codeGeneration: {
+    preview: (input: unknown) => invoke('code-generation:preview', input),
+  },
   experiments: {
     list: (input: unknown) => invoke('experiments:list', input),
     get: (input: unknown) => invoke('experiments:get', input),

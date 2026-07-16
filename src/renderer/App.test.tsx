@@ -71,3 +71,28 @@ it('opens and closes Request Export from the Tools menu', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Close' }))
   expect(screen.queryByRole('dialog', { name: 'Export Request' })).not.toBeInTheDocument()
 })
+
+it('opens and closes Code Generation from the Tools menu with the selected request', async () => {
+  window.requestStudio = {
+    workspaces: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'w', name: 'Workspace' }] }) },
+    collections: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'c', name: 'API' }] }) },
+    savedRequests: {
+      list: vi.fn().mockResolvedValue({
+        ok: true,
+        data: [{ id: 'request-id', name: 'Users', protocol: 'http', method: 'GET', url: '', description: '' }],
+      }),
+    },
+    experiments: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    codeGeneration: { preview: vi.fn() },
+    streaming: { onEvent: vi.fn() },
+    http: { onExecutionEvent: vi.fn() },
+  }
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'HTTP · Users' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Generate Code...' }))
+  expect(screen.getByRole('dialog', { name: 'Generate Code' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Saved Request')).toHaveValue('request-id')
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+  expect(screen.queryByRole('dialog', { name: 'Generate Code' })).not.toBeInTheDocument()
+})

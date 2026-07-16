@@ -14,6 +14,7 @@ import { registerExperimentHandlers } from './ipc/experiment-handlers'
 import { ExperimentRunner } from './experiments/experiment-runner'
 import { registerCurlImportHandlers } from './ipc/curl-import-handlers'
 import { registerRequestExportHandlers } from './ipc/request-export-handlers'
+import { registerCodeGenerationHandlers } from './ipc/code-generation-handlers'
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'request-studio-resource',
@@ -257,6 +258,7 @@ app
     registerIpc(repo)
     registerCurlImportHandlers(repo)
     registerRequestExportHandlers(repo, userData)
+    registerCodeGenerationHandlers(repo)
     httpService = registerHttpHandlers(db, path.join(userData, 'history-assets'), [streamAssets, experimentAssets])
     streamService = registerStreamingHandlers(db, {
       assetRoot: streamAssets,

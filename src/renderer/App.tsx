@@ -8,6 +8,7 @@ import StreamHistoryPanel from './StreamHistoryPanel'
 import ExperimentWorkspace from './ExperimentWorkspace'
 import CurlImportPanel from './CurlImportPanel'
 import RequestExportPanel from './RequestExportPanel'
+import CodeGenerationPanel from './CodeGenerationPanel'
 import { httpRequestDraftSchema } from '../shared/schemas/http'
 import {
   defaultSseConfig,
@@ -80,6 +81,7 @@ export default function App() {
     [showTools, setShowTools] = useState(false),
     [showCurlImport, setShowCurlImport] = useState(false),
     [showRequestExport, setShowRequestExport] = useState(false),
+    [showCodeGeneration, setShowCodeGeneration] = useState(false),
     [executionId, setExecutionId] = useState(''),
     [executionState, setExecutionState] = useState('idle'),
     [response, setResponse] = useState<any>(null),
@@ -377,6 +379,15 @@ export default function App() {
               >
                 Export Request...
               </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setShowTools(false)
+                  setShowCodeGeneration(true)
+                }}
+              >
+                Generate Code...
+              </button>
             </div>
           )}
         </div>
@@ -525,6 +536,14 @@ export default function App() {
           requests={requests}
           initialRequestId={selected?.id ?? ''}
           onClose={() => setShowRequestExport(false)}
+        />
+      )}
+      {showCodeGeneration && (
+        <CodeGenerationPanel
+          workspaceId={workspace}
+          requests={requests}
+          initialRequestId={selected?.id ?? ''}
+          onClose={() => setShowCodeGeneration(false)}
         />
       )}
     </div>
