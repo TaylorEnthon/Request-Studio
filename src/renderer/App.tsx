@@ -6,6 +6,7 @@ import HistoryPanel from './HistoryPanel'
 import StreamingRequestEditor from './StreamingRequestEditor'
 import StreamHistoryPanel from './StreamHistoryPanel'
 import ExperimentWorkspace from './ExperimentWorkspace'
+import CurlImportPanel from './CurlImportPanel'
 import { httpRequestDraftSchema } from '../shared/schemas/http'
 import {
   defaultSseConfig,
@@ -75,6 +76,8 @@ export default function App() {
     [showSettings, setShowSettings] = useState(false),
     [showHistory, setShowHistory] = useState(false),
     [showStreamHistory, setShowStreamHistory] = useState(false),
+    [showTools, setShowTools] = useState(false),
+    [showCurlImport, setShowCurlImport] = useState(false),
     [executionId, setExecutionId] = useState(''),
     [executionState, setExecutionState] = useState('idle'),
     [response, setResponse] = useState<any>(null),
@@ -343,6 +346,29 @@ export default function App() {
         </button>
         <span className="spacer" />
         <span>{status}</span>
+        <div className="tools-menu">
+          <button
+            aria-haspopup="menu"
+            aria-expanded={showTools}
+            disabled={!workspace}
+            onClick={() => setShowTools((value) => !value)}
+          >
+            Tools
+          </button>
+          {showTools && (
+            <div className="tools-menu-popup" role="menu">
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setShowTools(false)
+                  setShowCurlImport(true)
+                }}
+              >
+                Import cURL...
+              </button>
+            </div>
+          )}
+        </div>
         <button onClick={() => setShowHistory(true)} disabled={!workspace}>
           HTTP History
         </button>
@@ -469,6 +495,19 @@ export default function App() {
         />
       )}
       {showStreamHistory && <StreamHistoryPanel workspaceId={workspace} onClose={() => setShowStreamHistory(false)} />}
+      {showCurlImport && (
+        <CurlImportPanel
+          workspaceId={workspace}
+          collections={collections}
+          onClose={() => setShowCurlImport(false)}
+          onImported={async (request) => {
+            await loadWorkspace()
+            setSelected(request as RequestRow)
+            setSelectedExperimentId('')
+            setShowCurlImport(false)
+          }}
+        />
+      )}
     </div>
   )
 }

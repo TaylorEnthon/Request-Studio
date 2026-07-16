@@ -37,6 +37,10 @@ contextBridge.exposeInMainWorld('requestStudio', {
     delete: (input: unknown) => invoke('requests:delete', input),
     duplicate: (input: unknown) => invoke('requests:duplicate', input),
   },
+  curlImport: {
+    preview: (input: unknown) => invoke('curl-import:preview', input),
+    save: (input: unknown) => invoke('curl-import:save', input),
+  },
   experiments: {
     list: (input: unknown) => invoke('experiments:list', input),
     get: (input: unknown) => invoke('experiments:get', input),

@@ -55,6 +55,7 @@ const ERROR_MESSAGES: Record<CurlErrorCode, string> = {
   MISSING_VALUE: 'A supported cURL option is missing a value.',
   UNSUPPORTED_FLAG: 'The cURL command contains an unsupported option.',
   INVALID_HEADER: 'The cURL command contains an invalid header.',
+  INVALID_BODY: 'The cURL command contains invalid JSON data.',
   INVALID_URL: 'The cURL command contains an invalid or unsupported URL.',
   FILE_REFERENCE: 'File references are not supported in cURL preview.',
   MULTIPLE_URLS: 'Exactly one request URL is supported.',

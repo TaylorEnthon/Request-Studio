@@ -163,6 +163,18 @@ describe('parseCurl', () => {
     expect(JSON.stringify(parsed)).not.toContain(secret)
   })
 
+  it('sanitizes sensitive form and JSON data without an explicit content type', () => {
+    const formSecret = ['form', 'secret', 'fixture'].join('-')
+    const jsonSecret = ['json', 'secret', 'fixture'].join('-')
+    const form = parseCurl(`curl -d 'password=${formSecret}&name=test' https://example.com`)
+    const json = parseCurl(`curl -d '{"password":"${jsonSecret}"}' https://example.com`)
+
+    expect(form.request.body).toEqual({ type: 'text', content: 'password={{PASSWORD}}&name=test' })
+    expect(json.request.body).toEqual({ type: 'text', content: '{"password":"{{PASSWORD}}"}' })
+    expect(JSON.stringify([form, json])).not.toContain(formSecret)
+    expect(JSON.stringify([form, json])).not.toContain(jsonSecret)
+  })
+
   it.each([
     'curl -d @file.json https://example.com',
     'curl --data-raw @file.json https://example.com',

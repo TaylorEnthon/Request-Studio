@@ -28,3 +28,22 @@ it('creates an Experiment from the selected request and lists it in the explorer
   await waitFor(() => expect(create).toHaveBeenCalledWith({ workspaceId: 'w', savedRequestId: '00000000-0000-4000-8000-000000000001', name: 'Prompt Test' }))
   expect(await screen.findByRole('button', { name: 'HTTP · Prompt Test · 1 Run' })).toBeInTheDocument()
 })
+
+it('opens cURL Import from the Tools menu for the selected workspace', async () => {
+  window.requestStudio = {
+    workspaces: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'w', name: 'Workspace' }] }) },
+    collections: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'c', name: 'API' }] }) },
+    savedRequests: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    experiments: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    environments: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    curlImport: { preview: vi.fn(), save: vi.fn() },
+    streaming: { onEvent: vi.fn() },
+    http: { onExecutionEvent: vi.fn() },
+  }
+  render(<App />)
+  await screen.findByText('API')
+  fireEvent.click(await screen.findByRole('button', { name: 'Tools' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Import cURL...' }))
+  expect(screen.getByRole('heading', { name: 'Import cURL' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+})
