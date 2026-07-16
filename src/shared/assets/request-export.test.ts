@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mapSavedRequestToExportAsset } from './request-export'
+import { requestAssetV1Schema, type RequestAssetV1 } from './request-asset'
+import {
+  mapSavedRequestToExportAsset,
+  sanitizeRequestAssetForOutput,
+} from './request-export'
 
 const websocketConfig = JSON.stringify({
   subprotocols: [],
@@ -40,6 +44,38 @@ const baseRow = {
 }
 
 describe('mapSavedRequestToExportAsset', () => {
+  it('sanitizes an existing request asset with the export rules', () => {
+    const unsafe = {
+      format: 'request-studio.request',
+      version: 1,
+      protocol: 'http',
+      name: 'Users',
+      description: 'source=C:\\Users\\me\\secret.txt',
+      request: {
+        method: 'POST',
+        url: 'https://api.example.com/users?api_key=raw-query',
+        params: [
+          { id: 'p1', enabled: true, key: 'token', value: 'raw-param' },
+          { id: 'p2', enabled: true, key: 'visible', value: '{{VISIBLE_TOKEN}}' },
+        ],
+        headers: [{ id: 'h1', enabled: true, key: 'X-Api-Key', value: 'raw-header' }],
+        auth: { type: 'bearer', token: 'raw-bearer' },
+        body: { type: 'json', content: '{"password":"raw-body","name":"Ada"}' },
+        settings: { timeoutMs: 30000 },
+      },
+    }
+
+    const result = sanitizeRequestAssetForOutput(unsafe as unknown as RequestAssetV1)
+    const serialized = JSON.stringify(result)
+
+    expect(serialized).not.toMatch(
+      /raw-query|raw-param|raw-header|raw-bearer|raw-body|C:\\\\Users/,
+    )
+    expect(serialized).toContain('{{VISIBLE_TOKEN}}')
+    expect(serialized).toContain('[REDACTED]')
+    expect(requestAssetV1Schema.parse(result)).toEqual(result)
+  })
+
   it.each([
     ['http', 'https://api.example.com/items', 'POST', '{}'],
     ['websocket', 'wss://api.example.com/events', null, websocketConfig],

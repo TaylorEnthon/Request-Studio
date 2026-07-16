@@ -1,4 +1,4 @@
-import type { RequestAssetV1 } from './request-asset'
+import { requestAssetV1Schema, type RequestAssetV1 } from './request-asset'
 import { mapSavedRequestToAsset, type SavedRequestAssetRow } from './request-asset-mapper'
 
 export type ExportWarning = Readonly<{ code: string; message: string }>
@@ -169,6 +169,29 @@ function sanitizeStreamConfig(value: unknown): unknown {
   const config = { ...(value as Record<string, unknown>) }
   if ('body' in config) config.body = sanitizeBody(config.body)
   return config
+}
+
+export function sanitizeRequestAssetForOutput(asset: RequestAssetV1): RequestAssetV1 {
+  try {
+    const request = asset.request
+    const sanitizedRequest: Record<string, unknown> = {
+      ...request,
+      url: sanitizeUrl(request.url),
+      params: sanitizeEntries(request.params),
+      headers: sanitizeEntries(request.headers),
+      auth: sanitizeAuth(request.auth),
+    }
+    if ('body' in request) sanitizedRequest.body = sanitizeBody(request.body)
+
+    return requestAssetV1Schema.parse({
+      ...asset,
+      name: sanitizeText(asset.name),
+      description: sanitizeText(asset.description),
+      request: sanitizedRequest,
+    })
+  } catch {
+    throw new TypeError(INVALID_EXPORT_DATA)
+  }
 }
 
 export function mapSavedRequestToExportAsset(row: SavedRequestAssetRow): RequestAssetV1 {
