@@ -160,4 +160,3 @@ git diff --check
 The implementation should stay inside `src/shared/assets/request-export.ts`
 and a small `src/shared/codegen/` directory with colocated tests. No Main,
 Renderer, Preload, IPC, database, execution, or CI file needs modification.
-
