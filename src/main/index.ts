@@ -12,6 +12,7 @@ import { registerStreamingHandlers } from './ipc/streaming-handlers'
 import { savedSseUpdateSchema, savedWebSocketUpdateSchema } from '../shared/streaming/streaming-schemas'
 import { registerExperimentHandlers } from './ipc/experiment-handlers'
 import { ExperimentRunner } from './experiments/experiment-runner'
+import { registerCurlImportHandlers } from './ipc/curl-import-handlers'
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'request-studio-resource',
@@ -251,7 +252,9 @@ app
       streamAssets = path.join(userData, 'stream-assets'),
       experimentAssets = path.join(userData, 'experiment-assets')
     db = createDatabase(path.join(userData, 'request-studio.db'))
-    registerIpc(new Repository(db))
+    const repo = new Repository(db)
+    registerIpc(repo)
+    registerCurlImportHandlers(repo)
     httpService = registerHttpHandlers(db, path.join(userData, 'history-assets'), [streamAssets, experimentAssets])
     streamService = registerStreamingHandlers(db, {
       assetRoot: streamAssets,
