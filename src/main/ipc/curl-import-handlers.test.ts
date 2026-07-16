@@ -30,6 +30,7 @@ beforeEach(() => handlers.clear())
 
 it('previews sanitized cURL and imports it once through the existing transaction', async () => {
   const { db, repo } = setup()
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined)
   const result = await preview()
   expect(result.ok).toBe(true)
   expect(result.data.previewId).toMatch(/^[0-9a-f-]{36}$/)
@@ -54,6 +55,8 @@ it('previews sanitized cURL and imports it once through the existing transaction
     ok: false,
     error: { code: 'PREVIEW_EXPIRED' },
   })
+  expect(logged).not.toHaveBeenCalled()
+  logged.mockRestore()
   db.close()
 })
 
@@ -85,6 +88,15 @@ it('rejects collection and environment ownership mismatches without consuming th
     name: 'Imported request',
     variableMappings: [{ placeholder: '{{TOKEN}}', variableName: 'API_TOKEN' }],
   }
+  expect(
+    await handlers.get('curl-import:save')!(null, {
+      ...base,
+      workspaceId: 'other',
+      collectionId: 'c',
+    }),
+  ).toMatchObject({ ok: false, error: { code: 'IMPORT_FAILED' } })
+  expect(repo.list('saved_requests', 'workspace_id', 'w')).toHaveLength(0)
+
   expect(await handlers.get('curl-import:save')!(null, { ...base, collectionId: 'other-c' })).toMatchObject({
     ok: false,
     error: { code: 'IMPORT_FAILED' },
