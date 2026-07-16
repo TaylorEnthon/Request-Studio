@@ -7,6 +7,7 @@ import StreamingRequestEditor from './StreamingRequestEditor'
 import StreamHistoryPanel from './StreamHistoryPanel'
 import ExperimentWorkspace from './ExperimentWorkspace'
 import CurlImportPanel from './CurlImportPanel'
+import RequestExportPanel from './RequestExportPanel'
 import { httpRequestDraftSchema } from '../shared/schemas/http'
 import {
   defaultSseConfig,
@@ -78,6 +79,7 @@ export default function App() {
     [showStreamHistory, setShowStreamHistory] = useState(false),
     [showTools, setShowTools] = useState(false),
     [showCurlImport, setShowCurlImport] = useState(false),
+    [showRequestExport, setShowRequestExport] = useState(false),
     [executionId, setExecutionId] = useState(''),
     [executionState, setExecutionState] = useState('idle'),
     [response, setResponse] = useState<any>(null),
@@ -366,6 +368,15 @@ export default function App() {
               >
                 Import cURL...
               </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setShowTools(false)
+                  setShowRequestExport(true)
+                }}
+              >
+                Export Request...
+              </button>
             </div>
           )}
         </div>
@@ -506,6 +517,14 @@ export default function App() {
             setSelectedExperimentId('')
             setShowCurlImport(false)
           }}
+        />
+      )}
+      {showRequestExport && (
+        <RequestExportPanel
+          workspaceId={workspace}
+          requests={requests}
+          initialRequestId={selected?.id ?? ''}
+          onClose={() => setShowRequestExport(false)}
         />
       )}
     </div>

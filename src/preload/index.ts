@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld('requestStudio', {
     preview: (input: unknown) => invoke('curl-import:preview', input),
     save: (input: unknown) => invoke('curl-import:save', input),
   },
+  requestExport: {
+    preview: (input: unknown) => invoke('request-export:preview', input),
+    save: (previewId: string) => invoke('request-export:save', { previewId }),
+  },
   experiments: {
     list: (input: unknown) => invoke('experiments:list', input),
     get: (input: unknown) => invoke('experiments:get', input),
