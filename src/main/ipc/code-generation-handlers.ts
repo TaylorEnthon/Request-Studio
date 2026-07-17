@@ -2,14 +2,20 @@ import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { SavedRequestAssetRow } from '../../shared/assets/request-asset-mapper'
 import { mapSavedRequestToExportAsset } from '../../shared/assets/request-export'
-import { generateCode } from '../../shared/codegen/code-generation'
+import { generateCode, listCodeGenerators } from '../../shared/codegen/code-generation'
 import type { Repository } from '../repository'
 import { validate } from './validate'
 
 const inputSchema = z.object({
   workspaceId: z.string().min(1),
   requestId: z.string().min(1),
-  language: z.enum(['javascript-fetch', 'python-requests']),
+  language: z.enum([
+    'javascript-fetch',
+    'python-requests',
+    'typescript-axios',
+    'sse-fetch',
+    'browser-websocket',
+  ]),
 }).strict()
 
 const failure = (code: string, message: string) => ({
@@ -18,6 +24,7 @@ const failure = (code: string, message: string) => ({
 })
 
 export function registerCodeGenerationHandlers(repo: Repository): void {
+  ipcMain.handle('code-generation:list', () => ({ ok: true as const, data: listCodeGenerators() }))
   ipcMain.handle('code-generation:preview', (_event, input) => {
     const checked = validate(inputSchema, input)
     if (!checked.ok) return checked

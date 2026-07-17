@@ -45,12 +45,28 @@ const setup = () => {
       maxReconnectAttempts: 3, reconnectDelayMs: 1000, maxMessageBytes: 1048576,
     }),
   })
+  repo.create('saved_requests', {
+    id: 'request-sse',
+    ...common,
+    protocol: 'sse',
+    method: 'GET',
+    url: 'https://api.example.com/events',
+    stream_config_json: JSON.stringify({
+      method: 'GET',
+      body: { type: 'none' },
+      connectTimeoutMs: 10000,
+      idleTimeoutMs: 60000,
+      maxEventBytes: 1048576,
+      maxSessionDurationMs: 1800000,
+    }),
+  })
   registerCodeGenerationHandlers(repo)
   return db
 }
 
 const preview = (input: Record<string, unknown>) =>
   handlers.get('code-generation:preview')!({}, input) as any
+const list = () => handlers.get('code-generation:list')!({}, undefined) as any
 
 beforeEach(() => handlers.clear())
 
@@ -66,6 +82,37 @@ it.each([
     /raw-codegen-secret|raw-codegen-token|C:\\\\Users|request-http|workspace-a/,
   )
   expect(result.data.content).toContain('[REDACTED]')
+  db.close()
+})
+
+it('lists only the five code generator capabilities', () => {
+  const db = setup()
+  expect(handlers.has('code-generation:list')).toBe(true)
+  const result = list()
+  expect(result).toEqual({
+    ok: true,
+    data: [
+      { language: 'javascript-fetch', displayName: 'JavaScript Fetch', supportedProtocols: ['http'] },
+      { language: 'python-requests', displayName: 'Python requests', supportedProtocols: ['http'] },
+      { language: 'typescript-axios', displayName: 'TypeScript Axios', supportedProtocols: ['http'] },
+      { language: 'sse-fetch', displayName: 'SSE Fetch', supportedProtocols: ['sse'] },
+      { language: 'browser-websocket', displayName: 'Browser WebSocket', supportedProtocols: ['websocket'] },
+    ],
+  })
+  expect(JSON.stringify(result)).not.toMatch(/raw-codegen-secret|raw-codegen-token|request-http|workspace-a/)
+  db.close()
+})
+
+it.each([
+  ['typescript-axios', 'request-http', 'axios.request('],
+  ['sse-fetch', 'request-sse', 'fetch('],
+  ['browser-websocket', 'request-websocket', 'new WebSocket('],
+])('previews sanitized %s code for its compatible request', (language, requestId, marker) => {
+  const db = setup()
+  const result = preview({ workspaceId: 'workspace-a', requestId, language })
+  expect(result).toMatchObject({ ok: true, data: { language } })
+  expect(result.data.content).toContain(marker)
+  expect(JSON.stringify(result)).not.toMatch(/raw-codegen-secret|raw-codegen-token|request-|workspace-a/)
   db.close()
 })
 

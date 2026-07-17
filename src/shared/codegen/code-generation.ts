@@ -5,8 +5,16 @@ import {
 } from '../assets/request-export'
 import { generateJavaScriptFetch } from './javascript-fetch-generator'
 import { generatePythonRequests } from './python-requests-generator'
+import { generateSseFetch } from './sse-fetch-generator'
+import { generateTypeScriptAxios } from './typescript-axios-generator'
+import { generateBrowserWebSocket } from './websocket-browser-generator'
 
-export type CodeGenerationLanguage = 'javascript-fetch' | 'python-requests'
+export type CodeGenerationLanguage =
+  | 'javascript-fetch'
+  | 'python-requests'
+  | 'typescript-axios'
+  | 'sse-fetch'
+  | 'browser-websocket'
 
 export type CodeGeneratorCapability = Readonly<{
   language: CodeGenerationLanguage
@@ -32,9 +40,32 @@ export type HttpCodeGenerationModel = Readonly<{
   warnings: readonly ExportWarning[]
 }>
 
+export type SseCodeGenerationModel = Readonly<{
+  method: Extract<RequestAssetV1, { protocol: 'sse' }>['request']['method']
+  url: string
+  headers: readonly Readonly<{ key: string; value: string }>[]
+  basicAuth: HttpCodeGenerationModel['basicAuth']
+  body: HttpCodeGenerationModel['body']
+  warnings: readonly ExportWarning[]
+}>
+
+export type WebSocketCodeGenerationModel = Readonly<{
+  url: string
+  subprotocols: readonly string[]
+  warnings: readonly ExportWarning[]
+}>
+
+type CodeGenerationModel =
+  | HttpCodeGenerationModel
+  | SseCodeGenerationModel
+  | WebSocketCodeGenerationModel
 type Adapter = CodeGeneratorCapability &
-  Readonly<{ generate: (model: HttpCodeGenerationModel) => string }>
+  Readonly<{ generate: (model: CodeGenerationModel) => string }>
 type QueryEntry = Readonly<{ enabled: boolean; key: string; value: string }>
+type HttpLikeRequest =
+  | Extract<RequestAssetV1, { protocol: 'http' }>['request']
+  | Extract<RequestAssetV1, { protocol: 'sse' }>['request']
+type NormalizedHttpFields = Omit<HttpCodeGenerationModel, 'method'>
 
 const encodePart = (value: string): string =>
   value
@@ -61,10 +92,10 @@ function withQuery(url: string, entries: readonly QueryEntry[]): string {
   return `${base}${separator}${query}${fragment}`
 }
 
-function createHttpModel(
-  asset: Extract<RequestAssetV1, { protocol: 'http' }>,
-): HttpCodeGenerationModel {
-  const request = asset.request
+function normalizeHttpLikeRequest(
+  request: HttpLikeRequest,
+  hasRedactedValues: boolean,
+): NormalizedHttpFields {
   const query: QueryEntry[] = request.params.map(({ enabled, key, value }) => ({
     enabled,
     key,
@@ -124,18 +155,75 @@ function createHttpModel(
     })
   }
 
-  if (JSON.stringify(asset).includes('[REDACTED]')) {
+  if (hasRedactedValues) {
     warnings.unshift({
       code: 'sanitized-values',
       message: 'Sensitive values were redacted.',
     })
   }
   return {
-    method: request.method,
     url: withQuery(request.url, query),
     headers,
     basicAuth,
     body,
+    warnings,
+  }
+}
+
+function createHttpModel(
+  asset: Extract<RequestAssetV1, { protocol: 'http' }>,
+): HttpCodeGenerationModel {
+  return {
+    method: asset.request.method,
+    ...normalizeHttpLikeRequest(asset.request, JSON.stringify(asset).includes('[REDACTED]')),
+  }
+}
+
+function createSseModel(
+  asset: Extract<RequestAssetV1, { protocol: 'sse' }>,
+): SseCodeGenerationModel {
+  return {
+    method: asset.request.method,
+    ...normalizeHttpLikeRequest(asset.request, JSON.stringify(asset).includes('[REDACTED]')),
+  }
+}
+
+function createWebSocketModel(
+  asset: Extract<RequestAssetV1, { protocol: 'websocket' }>,
+): WebSocketCodeGenerationModel {
+  const request = asset.request
+  const query: QueryEntry[] = request.params.map(({ enabled, key, value }) => ({
+    enabled,
+    key,
+    value,
+  }))
+  const omitsHeaders =
+    request.headers.some(({ enabled }) => enabled) ||
+    request.auth.type === 'bearer' ||
+    request.auth.type === 'basic' ||
+    (request.auth.type === 'api-key' && request.auth.placement === 'header')
+
+  if (request.auth.type === 'api-key' && request.auth.placement === 'query') {
+    query.push({ enabled: true, key: request.auth.key, value: request.auth.value })
+  }
+
+  const warnings: ExportWarning[] = []
+  if (JSON.stringify(asset).includes('[REDACTED]')) {
+    warnings.push({
+      code: 'sanitized-values',
+      message: 'Sensitive values were redacted.',
+    })
+  }
+  if (omitsHeaders) {
+    warnings.push({
+      code: 'browser-websocket-headers-omitted',
+      message: 'Browser WebSocket does not support custom headers or header-based authentication.',
+    })
+  }
+
+  return {
+    url: withQuery(request.url, query),
+    subprotocols: request.subprotocols,
     warnings,
   }
 }
@@ -145,13 +233,31 @@ const adapters: readonly Adapter[] = [
     language: 'javascript-fetch',
     displayName: 'JavaScript Fetch',
     supportedProtocols: ['http'],
-    generate: generateJavaScriptFetch,
+    generate: (model) => generateJavaScriptFetch(model as HttpCodeGenerationModel),
   },
   {
     language: 'python-requests',
     displayName: 'Python requests',
     supportedProtocols: ['http'],
-    generate: generatePythonRequests,
+    generate: (model) => generatePythonRequests(model as HttpCodeGenerationModel),
+  },
+  {
+    language: 'typescript-axios',
+    displayName: 'TypeScript Axios',
+    supportedProtocols: ['http'],
+    generate: (model) => generateTypeScriptAxios(model as HttpCodeGenerationModel),
+  },
+  {
+    language: 'sse-fetch',
+    displayName: 'SSE Fetch',
+    supportedProtocols: ['sse'],
+    generate: (model) => generateSseFetch(model as SseCodeGenerationModel),
+  },
+  {
+    language: 'browser-websocket',
+    displayName: 'Browser WebSocket',
+    supportedProtocols: ['websocket'],
+    generate: (model) => generateBrowserWebSocket(model as WebSocketCodeGenerationModel),
   },
 ]
 
@@ -171,10 +277,15 @@ export function generateCode(
   if (!adapter) throw new TypeError('Code generator is not available.')
 
   const sanitized = sanitizeRequestAssetForOutput(asset)
-  if (!adapter.supportedProtocols.includes(sanitized.protocol) || sanitized.protocol !== 'http') {
+  if (!adapter.supportedProtocols.includes(sanitized.protocol)) {
     throw new TypeError('Code generator does not support this protocol.')
   }
-  const model = createHttpModel(sanitized)
+  const model =
+    sanitized.protocol === 'http'
+      ? createHttpModel(sanitized)
+      : sanitized.protocol === 'sse'
+        ? createSseModel(sanitized)
+        : createWebSocketModel(sanitized)
   return {
     language,
     content: adapter.generate(model),
