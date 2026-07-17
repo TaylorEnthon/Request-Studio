@@ -72,6 +72,7 @@ function sanitizeEntries(value: unknown): unknown {
   return value.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry
     const copy = { ...(entry as Record<string, unknown>) }
+    if (typeof copy.value === 'string') copy.value = sanitizeText(copy.value)
     if (typeof copy.key === 'string' && sensitiveKey.test(copy.key)) {
       copy.value = protect(copy.value)
     }

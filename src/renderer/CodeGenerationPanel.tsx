@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 
-type Language = 'javascript-fetch' | 'python-requests'
 type RequestSummary = { id: string; name: string; protocol: 'http' | 'websocket' | 'sse' }
+type Language = string
+type Capability = {
+  language: Language
+  displayName: string
+  supportedProtocols: readonly RequestSummary['protocol'][]
+}
 type Preview = {
   language: Language
   content: string
@@ -17,7 +22,9 @@ type Props = {
 export default function CodeGenerationPanel({ workspaceId, requests, initialRequestId, onClose }: Props) {
   const initial = requests.find((request) => request.id === initialRequestId) ?? requests[0]
   const [requestId, setRequestId] = useState(initial?.id ?? '')
-  const [language, setLanguage] = useState<Language>('javascript-fetch')
+  const [language, setLanguage] = useState<Language>('')
+  const [capabilities, setCapabilities] = useState<Capability[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -31,6 +38,43 @@ export default function CodeGenerationPanel({ workspaceId, requests, initialRequ
     setError('')
     setStatus('')
   }
+  const request = requests.find((item) => item.id === requestId)
+  const compatible = request
+    ? capabilities.filter((capability) => capability.supportedProtocols.includes(request.protocol))
+    : []
+  const hasCompatibleLanguage = compatible.some((capability) => capability.language === language)
+
+  useEffect(() => {
+    let active = true
+    void Promise.resolve()
+      .then(() => window.requestStudio.codeGeneration.list())
+      .then((result: any) => {
+        if (!active) return
+        generation.current += 1
+        setPreview(null)
+        setBusy(false)
+        setStatus('')
+        if (result.ok) {
+          setCapabilities(result.data)
+          setError('')
+        } else {
+          setCapabilities([])
+          setError('Code generators could not be loaded.')
+        }
+        setLoaded(true)
+      })
+      .catch(() => {
+        if (!active) return
+        generation.current += 1
+        setPreview(null)
+        setBusy(false)
+        setStatus('')
+        setCapabilities([])
+        setError('Code generators could not be loaded.')
+        setLoaded(true)
+      })
+    return () => { active = false }
+  }, [])
   useEffect(() => {
     const next = requests.find((request) => request.id === initialRequestId)?.id ?? requests[0]?.id ?? ''
     if (!requests.some((request) => request.id === requestId) && requestId !== next) {
@@ -50,6 +94,19 @@ export default function CodeGenerationPanel({ workspaceId, requests, initialRequ
     setStatus('')
   }, [workspaceId])
   useEffect(() => {
+    const next = compatible.some((capability) => capability.language === language)
+      ? language
+      : compatible[0]?.language ?? ''
+    if (next !== language) {
+      generation.current += 1
+      setLanguage(next)
+      setPreview(null)
+      setBusy(false)
+      setError('')
+      setStatus('')
+    }
+  }, [capabilities, language, request?.protocol])
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
@@ -58,7 +115,7 @@ export default function CodeGenerationPanel({ workspaceId, requests, initialRequ
   }, [onClose])
 
   const generate = async () => {
-    if (!requestId) return
+    if (!requestId || !hasCompatibleLanguage) return
     clear()
     setBusy(true)
     const current = generation.current
@@ -106,12 +163,14 @@ export default function CodeGenerationPanel({ workspaceId, requests, initialRequ
         </label>
         <label>
           Language
-          <select value={language} onChange={(event) => { setLanguage(event.target.value as Language); clear() }}>
-            <option value="javascript-fetch">JavaScript Fetch</option>
-            <option value="python-requests">Python requests</option>
+          <select value={language} disabled={!loaded || compatible.length === 0} onChange={(event) => { setLanguage(event.target.value); clear() }}>
+            {compatible.length === 0 && <option value="">No compatible language</option>}
+            {compatible.map((capability) => (
+              <option key={capability.language} value={capability.language}>{capability.displayName}</option>
+            ))}
           </select>
         </label>
-        <button onClick={generate} disabled={!requestId || busy}>{busy ? 'Working…' : 'Generate'}</button>
+        <button onClick={generate} disabled={!requestId || !loaded || !hasCompatibleLanguage || busy}>{busy ? 'Working…' : 'Generate'}</button>
       </div>
 
       {error && <p className="error" role="alert">{error}</p>}

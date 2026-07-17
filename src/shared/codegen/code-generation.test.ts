@@ -46,8 +46,28 @@ const websocketAsset: RequestAssetV1 = {
   },
 }
 
+const sseAsset: RequestAssetV1 = {
+  format: 'request-studio.request',
+  version: 1,
+  protocol: 'sse',
+  name: 'Stream',
+  description: '',
+  request: {
+    method: 'GET',
+    url: 'https://api.example.com/events',
+    params: [],
+    headers: [],
+    auth: { type: 'none' },
+    body: { type: 'none' },
+    connectTimeoutMs: 10000,
+    idleTimeoutMs: 0,
+    maxEventBytes: 1048576,
+    maxSessionDurationMs: 60000,
+  },
+}
+
 describe('code generation contract', () => {
-  it('registers deterministic HTTP-only generator capabilities', () => {
+  it('registers deterministic exact generator capabilities', () => {
     expect(listCodeGenerators()).toEqual([
       {
         language: 'javascript-fetch',
@@ -59,6 +79,21 @@ describe('code generation contract', () => {
         displayName: 'Python requests',
         supportedProtocols: ['http'],
       },
+      {
+        language: 'typescript-axios',
+        displayName: 'TypeScript Axios',
+        supportedProtocols: ['http'],
+      },
+      {
+        language: 'sse-fetch',
+        displayName: 'SSE Fetch',
+        supportedProtocols: ['sse'],
+      },
+      {
+        language: 'browser-websocket',
+        displayName: 'Browser WebSocket',
+        supportedProtocols: ['websocket'],
+      },
     ])
     expect(listCodeGenerators()).toEqual(listCodeGenerators())
   })
@@ -68,6 +103,9 @@ describe('code generation contract', () => {
       'Code generator is not available.',
     )
     expect(() => generateCode(websocketAsset, 'javascript-fetch')).toThrow(
+      'Code generator does not support this protocol.',
+    )
+    expect(() => generateCode(sseAsset, 'typescript-axios')).toThrow(
       'Code generator does not support this protocol.',
     )
   })
@@ -94,6 +132,65 @@ describe('code generation contract', () => {
       message: 'Sensitive values were redacted.',
     })
     expect(JSON.stringify(first)).not.toContain('raw-generator-secret')
+  })
+
+  it.each([
+    ['typescript-axios', httpAsset],
+    ['sse-fetch', sseAsset],
+    ['browser-websocket', websocketAsset],
+  ] as const)('returns deterministic %s output', (language, asset) => {
+    expect(generateCode(asset, language)).toEqual(generateCode(asset, language))
+  })
+
+  it.each([
+    ['typescript-axios', httpAsset],
+    ['sse-fetch', sseAsset],
+    ['browser-websocket', websocketAsset],
+  ] as const)('keeps every adapter output free of source-only metadata', (language, asset) => {
+    const unsafe = {
+      ...asset,
+      request: {
+        ...asset.request,
+        headers: [
+          {
+            id: 'header-id-should-not-leak',
+            enabled: true,
+            key: 'Authorization',
+            value: 'raw-generator-secret',
+          },
+          { id: 'placeholder-id', enabled: true, key: 'X-Variable', value: '{{TOKEN}}' },
+        ],
+      },
+    } as unknown as RequestAssetV1
+
+    const result = generateCode(unsafe, language)
+
+    if (language !== 'browser-websocket') expect(result.content).toContain('{{TOKEN}}')
+    expect(JSON.stringify(result)).not.toContain('raw-generator-secret')
+    expect(JSON.stringify(result)).not.toContain('header-id-should-not-leak')
+  })
+
+  it.each([
+    ['typescript-axios', httpAsset],
+    ['sse-fetch', sseAsset],
+    ['browser-websocket', websocketAsset],
+  ] as const)('keeps local entry paths out of %s output', (language, asset) => {
+    const withPaths = {
+      ...asset,
+      request: {
+        ...asset.request,
+        params: [
+          { id: 'path-param', enabled: true, key: 'source', value: 'C:\\Users\\me\\query.txt' },
+        ],
+        headers: [
+          { id: 'path-header', enabled: true, key: 'X-Source', value: '/home/me/header.txt' },
+        ],
+      },
+    } as RequestAssetV1
+
+    expect(JSON.stringify(generateCode(withPaths, language))).not.toMatch(
+      /C:\\\\Users|C%3A%5CUsers|\/home\/me|%2Fhome%2Fme/,
+    )
   })
 
   it.each([

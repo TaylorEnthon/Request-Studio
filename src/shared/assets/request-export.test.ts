@@ -133,6 +133,38 @@ describe('mapSavedRequestToExportAsset', () => {
     )
   })
 
+  it('redacts local paths in ordinary entry values while preserving placeholders and text', () => {
+    const asset = sanitizeRequestAssetForOutput({
+      format: 'request-studio.request',
+      version: 1,
+      protocol: 'http',
+      name: 'Paths',
+      description: '',
+      request: {
+        method: 'GET',
+        url: 'https://api.example.com/items',
+        params: [
+          { id: 'p1', enabled: true, key: 'source', value: 'C:\\Users\\me\\query.txt' },
+          { id: 'p2', enabled: true, key: 'visible', value: '{{VISIBLE_PATH}}' },
+          { id: 'p3', enabled: true, key: 'label', value: 'ordinary value' },
+        ],
+        headers: [
+          { id: 'h1', enabled: true, key: 'X-Source', value: '/home/me/header.txt' },
+        ],
+        auth: { type: 'none' },
+        body: { type: 'none' },
+        settings: { timeoutMs: 30000 },
+      },
+    })
+
+    expect(asset.request.params.map(({ value }) => value)).toEqual([
+      '[REDACTED]',
+      '{{VISIBLE_PATH}}',
+      'ordinary value',
+    ])
+    expect(asset.request.headers[0].value).toBe('[REDACTED]')
+  })
+
   it('sanitizes WebSocket auth and an SSE form body', () => {
     const websocket = mapSavedRequestToExportAsset({
       ...baseRow,
