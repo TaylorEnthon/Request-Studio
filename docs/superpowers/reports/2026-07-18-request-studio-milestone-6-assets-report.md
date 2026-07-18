@@ -15,7 +15,7 @@ Milestone 6 delivers a complete local API asset workflow: versioned Request asse
 
 ## 3. CodeGraph
 
-The final-closure index started current at 147 files, 1,429 nodes, and 4,078 edges. After adding the smoke it was synchronized at 148 files, 1,469 nodes, and 4,175 edges. CodeGraph traced the four product paths from Renderer entry to shared contracts and Main-only persistence/file operations:
+The final-closure index started current at 147 files, 1,429 nodes, and 4,078 edges. After adding and hardening the smoke it was synchronized at 148 files, 1,469 nodes, and 4,176 edges. CodeGraph traced the four product paths from Renderer entry to shared contracts and Main-only persistence/file operations:
 
 - `CurlImportPanel → Preload → registerCurlImportHandlers → previewCurlImport → parseCurl → mapCurlImportSave → Repository.importCurl → SQLite`
 - `RequestExportPanel → Preload → request-export handlers → createRequestExportPreview → mapSavedRequestToExportAsset → output sanitizer → writeExportFileAtomic`
