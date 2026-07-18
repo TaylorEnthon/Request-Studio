@@ -85,7 +85,7 @@ export default function WorkspaceExportPanel({ workspaces, initialWorkspaceId, o
       <div className="row">
         <label>
           Workspace to export
-          <select value={workspaceId} onChange={(event) => { setWorkspaceId(event.target.value); clear() }}>
+          <select disabled={busy} value={workspaceId} onChange={(event) => { setWorkspaceId(event.target.value); clear() }}>
             <option value="">Select a workspace</option>
             {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
           </select>

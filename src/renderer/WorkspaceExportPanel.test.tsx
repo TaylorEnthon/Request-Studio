@@ -69,6 +69,20 @@ it('clears stale preview when the workspace changes and reports cancellation', a
   expect(await screen.findByRole('status')).toHaveTextContent('Save canceled.')
 })
 
+it('locks workspace selection while preview generation is pending', async () => {
+  let finishPreview!: (value: unknown) => void
+  setup({
+    workspaceExport: {
+      preview: vi.fn().mockReturnValue(new Promise((resolve) => { finishPreview = resolve })),
+      save: vi.fn(),
+    },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Preview' }))
+  expect(screen.getByLabelText('Workspace to export')).toBeDisabled()
+  finishPreview({ ok: true, data: previewState })
+  await waitFor(() => expect(screen.getByLabelText('Workspace to export')).not.toBeDisabled())
+})
+
 it('renders fixed errors and closes on Escape or Close', async () => {
   const { onClose } = setup({
     workspaceExport: {

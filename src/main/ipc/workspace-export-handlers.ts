@@ -10,7 +10,7 @@ import type { Repository } from '../repository'
 import { sanitizeExportFilename, writeExportFileAtomic } from '../export/request-export-file'
 import { validate } from './validate'
 
-const PREVIEW_LIMIT = 32 * 1024
+const PREVIEW_LIMIT_BYTES = 32 * 1024
 const previewInput = z.object({ workspaceId: z.string().min(1) }).strict()
 const saveInput = z.object({ previewId: z.string().uuid() }).strict()
 const failure = (code: string, message: string) => ({
@@ -20,10 +20,22 @@ const failure = (code: string, message: string) => ({
 
 const previewContent = (bundle: WorkspaceExportV1): { content: string; truncated: boolean } => {
   let content = ''
+  let bytes = 0
   for (const chunk of serializeWorkspaceExportV1Chunks(bundle)) {
-    const remaining = PREVIEW_LIMIT - content.length
-    if (chunk.length > remaining) return { content: content + chunk.slice(0, remaining), truncated: true }
-    content += chunk
+    const chunkBytes = Buffer.byteLength(chunk, 'utf8')
+    if (bytes + chunkBytes <= PREVIEW_LIMIT_BYTES) {
+      content += chunk
+      bytes += chunkBytes
+      continue
+    }
+    let remaining = PREVIEW_LIMIT_BYTES - bytes
+    for (const character of chunk) {
+      const characterBytes = Buffer.byteLength(character, 'utf8')
+      if (characterBytes > remaining) break
+      content += character
+      remaining -= characterBytes
+    }
+    return { content, truncated: true }
   }
   return { content, truncated: false }
 }

@@ -136,14 +136,15 @@ it('keeps workspace data isolated and previews large bundles with a fixed bound'
       workspace_id: 'workspace-b-db-id',
       collection_id: 'collection-b-db-id',
       name: `Request ${index}`,
-      description: 'x'.repeat(400),
+      description: '🙂'.repeat(400),
       protocol: 'http', method: 'GET', url: 'https://example.test', params_json: '[]', headers_json: '[]',
       auth_json: '{"type":"none"}', body_json: '{"type":"none"}', settings_json: '{"timeoutMs":30000}', stream_config_json: '{}',
     })
   }
   const result = await preview({ workspaceId: 'workspace-b-db-id' })
   expect(result).toMatchObject({ ok: true, data: { preview: { workspaceName: 'Workspace B', counts: { collections: 1, requests: 100, environments: 0 }, truncated: true } } })
-  expect(result.data.preview.content.length).toBeLessThanOrEqual(32 * 1024)
+  expect(Buffer.byteLength(result.data.preview.content, 'utf8')).toBeLessThanOrEqual(32 * 1024)
+  expect(result.data.preview.content).not.toContain('\uFFFD')
   expect(JSON.stringify(result)).not.toMatch(/Workspace A|workspace-a-db-id|raw-workspace-secret/)
   db.close()
 })
