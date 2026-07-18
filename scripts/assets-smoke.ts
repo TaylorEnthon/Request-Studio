@@ -40,7 +40,8 @@ const safe = (value: unknown, label: string, excludeIds = false, excludePaths = 
   const serialized = typeof value === 'string' ? value : JSON.stringify(value)
   assert.equal(serialized.includes(credential), false, `${label} exposed the credential fixture`)
   if (excludePaths) {
-    for (const path of paths) assert.equal(serialized.includes(path), false, `${label} exposed a local path`)
+    const normalized = serialized.replace(/\\+/g, '\\')
+    for (const path of paths) assert.equal(normalized.includes(path), false, `${label} exposed a local path`)
   }
   if (excludeIds) {
     for (const id of databaseIds) assert.equal(serialized.includes(id), false, `${label} exposed database metadata`)
@@ -49,6 +50,10 @@ const safe = (value: unknown, label: string, excludeIds = false, excludePaths = 
 
 let db: ReturnType<typeof createDatabase> | undefined
 try {
+  assert.throws(
+    () => safe({ nested: JSON.stringify({ path: paths[0] }) }, 'path detector'),
+    /exposed a local path/,
+  )
   mkdirSync(userData)
   mkdirSync(output)
   db = createDatabase(join(root, 'assets.db'))
