@@ -76,7 +76,16 @@ describe('WorkspaceExportV1', () => {
   })
 
   it('redacts request credentials, secret variables, and local filesystem paths', () => {
-    const serialized = JSON.stringify(mapWorkspaceExportV1(source()))
+    const candidate = source()
+    candidate.variables.push({
+      id: 'variable-path-key',
+      environment_id: 'environment-db-id',
+      key: 'C:\\Users\\Alice\\variable.txt',
+      value: 'safe',
+      is_secret: 0,
+      description: '',
+    })
+    const serialized = JSON.stringify(mapWorkspaceExportV1(candidate))
     expect(serialized).toContain('{{SAFE_LABEL}}')
     expect(serialized).not.toMatch(/raw-(?:description|header|auth|body|variable)|Users\\Alice|\/Users\/Alice/)
   })
@@ -100,5 +109,11 @@ describe('WorkspaceExportV1', () => {
     expect(content).toBe(serializeWorkspaceExportV1(bundle))
     expect(chunks.length).toBeGreaterThan(bundle.requests.length)
     expect(Math.max(...chunks.map((chunk) => chunk.length))).toBeLessThan(content.length / 10)
+  })
+
+  it('rejects a request that exceeds the per-item serialization bound', () => {
+    const candidate = source()
+    candidate.requests = [request({ description: 'x'.repeat(1_000_001) })]
+    expect(() => mapWorkspaceExportV1(candidate)).toThrow('Workspace export data is invalid.')
   })
 })

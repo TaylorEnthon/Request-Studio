@@ -8,6 +8,7 @@ import {
 } from './request-export'
 
 const INVALID_WORKSPACE_EXPORT = 'Workspace export data is invalid.'
+const MAX_REQUEST_ITEM_JSON_LENGTH = 1_000_000
 const name = z.string().trim().min(1).max(100)
 const text = z.string().max(100_000)
 const ref = z.string().regex(/^collection-[1-9]\d*$/)
@@ -37,6 +38,9 @@ export const workspaceExportV1Schema = z.object({
   bundle.requests.forEach((request, index) => {
     if (!refs.has(request.collectionRef)) {
       ctx.addIssue({ code: 'custom', path: ['requests', index, 'collectionRef'], message: 'Collection ref is unavailable.' })
+    }
+    if (JSON.stringify(request).length > MAX_REQUEST_ITEM_JSON_LENGTH) {
+      ctx.addIssue({ code: 'custom', path: ['requests', index], message: 'Request export item is too large.' })
     }
   })
 })
@@ -108,7 +112,7 @@ export function mapWorkspaceExportV1(source: WorkspaceExportSource): WorkspaceEx
         .map((variable) => {
           const isSecret = Boolean(variable.is_secret) || isSensitiveOutputKey(variable.key)
           return {
-            key: variable.key,
+            key: sanitizeTextForOutput(variable.key),
             value: isSecret ? '' : sanitizeTextForOutput(variable.value),
             isSecret,
             description: sanitizeTextForOutput(variable.description),
