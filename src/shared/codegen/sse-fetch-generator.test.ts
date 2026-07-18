@@ -40,6 +40,8 @@ describe('SSE Fetch generator', () => {
     expect(content).toContain('  const { done, value } = await reader.read()')
     expect(content).toContain('  if (done) break')
     expect(content).toContain('buffer += decoder.decode(value, { stream: true })')
+    expect(content).toContain('buffer.split(/(?:\\r\\n|\\r|\\n){2}/)')
+    expect(content).toContain('block.split(/\\r\\n|\\r|\\n/)')
     expect(content).toContain('const retry = fields.get("retry")')
     expect(content).toContain('console.log({ event, data, id, retry })')
     expect(content).toContain('// Use retry as the delay before reconnecting after a disconnect.')

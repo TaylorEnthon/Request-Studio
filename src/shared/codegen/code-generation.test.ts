@@ -232,4 +232,21 @@ describe('code generation contract', () => {
     expect(result.warnings.every(({ severity }) => severity === 'info' || severity === 'warning')).toBe(true)
   })
 
+  it('redacts local paths nested in a JSON body before adapter generation', () => {
+    const result = generateCode(
+      {
+        ...httpAsset,
+        request: {
+          ...httpAsset.request,
+          method: 'POST',
+          body: { type: 'json', content: '{"file":"/Users/Alice/private.txt"}' },
+        },
+      },
+      'javascript-fetch',
+    )
+
+    expect(result.content).toContain('[REDACTED]')
+    expect(JSON.stringify(result)).not.toContain('/Users/Alice/private.txt')
+  })
+
 })
