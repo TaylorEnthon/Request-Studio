@@ -165,6 +165,42 @@ describe('mapSavedRequestToExportAsset', () => {
     expect(asset.request.headers[0].value).toBe('[REDACTED]')
   })
 
+  it('redacts local paths from exported key fields', () => {
+    const asset = sanitizeRequestAssetForOutput({
+      format: 'request-studio.request',
+      version: 1,
+      protocol: 'http',
+      name: 'Path keys',
+      description: '',
+      request: {
+        method: 'POST',
+        url: 'https://api.example.com/items?view=public&encoded=C%3A%5CUsers%5Cme%5Curl.txt&posix=%2Fhome%2Fme%2Furl.txt',
+        params: [{ id: 'p1', enabled: true, key: 'C:\\Users\\me\\query.txt', value: 'safe' }],
+        headers: [{ id: 'h1', enabled: true, key: '/home/me/header.txt', value: 'safe' }],
+        auth: { type: 'api-key', placement: 'header', key: 'C:\\Users\\me\\auth.txt', value: '{{TOKEN}}' },
+        body: {
+          type: 'multipart',
+          entries: [{ id: 'm1', enabled: true, key: '/tmp/private.txt', kind: 'text', textValue: 'safe' }],
+        },
+        settings: { timeoutMs: 30000 },
+      },
+    })
+
+    expect(JSON.stringify(asset)).not.toMatch(/C:\\\\Users|\/(?:home|tmp)\//)
+    expect(asset.request.url).not.toMatch(/%5CUsers|%2Fhome/i)
+    if (asset.protocol !== 'http') throw new Error('Expected HTTP asset')
+
+    const basic = sanitizeRequestAssetForOutput({
+      ...asset,
+      request: {
+        ...asset.request,
+        url: 'https://api.example.com/items',
+        auth: { type: 'basic', username: '/home/me/user.txt', password: '{{PASSWORD}}' },
+      },
+    })
+    expect(JSON.stringify(basic)).not.toContain('/home/me/user.txt')
+  })
+
   it('sanitizes WebSocket auth and an SSE form body', () => {
     const websocket = mapSavedRequestToExportAsset({
       ...baseRow,

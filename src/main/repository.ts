@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { CurlImportSavePlan } from '../shared/curl/curl-import-save'
+import type { WorkspaceExportSource } from '../shared/assets/workspace-export'
 
 const now = () => new Date().toISOString()
 export class Repository {
@@ -47,6 +48,19 @@ export class Repository {
         return {request,variables}
       })()
     } catch { throw new Error('cURL import could not be saved.') }
+  }
+  getWorkspaceExportSource(workspaceId: string): WorkspaceExportSource | undefined {
+    const workspace=this.db.prepare('SELECT id,name FROM workspaces WHERE id=?').get(workspaceId) as WorkspaceExportSource['workspace']|undefined
+    if(!workspace)return undefined
+    return {
+      workspace,
+      collections:this.db.prepare('SELECT id,workspace_id,name FROM collections WHERE workspace_id=? ORDER BY name,id').all(workspaceId) as WorkspaceExportSource['collections'],
+      requests:this.db.prepare(`SELECT id,workspace_id,collection_id,name,description,protocol,method,url,params_json,headers_json,auth_json,body_json,settings_json,stream_config_json
+        FROM saved_requests WHERE workspace_id=? ORDER BY name,id`).all(workspaceId) as WorkspaceExportSource['requests'],
+      environments:this.db.prepare('SELECT id,workspace_id,name FROM environments WHERE workspace_id=? ORDER BY name,id').all(workspaceId) as WorkspaceExportSource['environments'],
+      variables:this.db.prepare(`SELECT v.id,v.environment_id,v.key,v.value,v.is_secret,v.description FROM environment_variables v
+        JOIN environments e ON e.id=v.environment_id WHERE e.workspace_id=? ORDER BY v.key,v.id`).all(workspaceId) as WorkspaceExportSource['variables'],
+    }
   }
   deleteWorkspace(id: string) {
     this.db.transaction(()=>{this.clearSetting(`selectedEnvironment:${id}`);this.db.prepare('DELETE FROM workspaces WHERE id=?').run(id)})()

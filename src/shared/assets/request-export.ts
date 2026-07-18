@@ -37,7 +37,7 @@ function sanitizeUrl(value: string): string {
     '$1[REDACTED]@',
   )
   const queryStart = safeAuthority.indexOf('?')
-  if (queryStart < 0) return safeAuthority
+  if (queryStart < 0) return sanitizeText(safeAuthority)
   const fragmentStart = safeAuthority.indexOf('#', queryStart)
   const queryEnd = fragmentStart < 0 ? safeAuthority.length : fragmentStart
   const query = safeAuthority.slice(queryStart + 1, queryEnd)
@@ -52,7 +52,6 @@ function sanitizeUrl(value: string): string {
       } catch {
         throw new TypeError(INVALID_EXPORT_DATA)
       }
-      if (!sensitiveKey.test(key)) return part
       const rawValue = separator < 0 ? '' : part.slice(separator + 1)
       let decodedValue: string
       try {
@@ -60,11 +59,14 @@ function sanitizeUrl(value: string): string {
       } catch {
         throw new TypeError(INVALID_EXPORT_DATA)
       }
-      const safeValue = protect(decodedValue)
-      return `${rawKey}=${safeValue === decodedValue ? rawValue : String(safeValue)}`
+      const safeKey = sanitizeText(key)
+      const safeValue = sensitiveKey.test(key) ? protect(decodedValue) : sanitizeText(decodedValue)
+      const outputKey = safeKey === key ? rawKey : safeKey
+      if (separator < 0) return outputKey
+      return `${outputKey}=${safeValue === decodedValue ? rawValue : String(safeValue)}`
     })
     .join('&')
-  return `${safeAuthority.slice(0, queryStart + 1)}${sanitized}${safeAuthority.slice(queryEnd)}`
+  return sanitizeText(`${safeAuthority.slice(0, queryStart + 1)}${sanitized}${safeAuthority.slice(queryEnd)}`)
 }
 
 function sanitizeEntries(value: unknown): unknown {
@@ -73,8 +75,10 @@ function sanitizeEntries(value: unknown): unknown {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry
     const copy = { ...(entry as Record<string, unknown>) }
     if (typeof copy.value === 'string') copy.value = sanitizeText(copy.value)
-    if (typeof copy.key === 'string' && sensitiveKey.test(copy.key)) {
-      copy.value = protect(copy.value)
+    if (typeof copy.key === 'string') {
+      const key = copy.key
+      if (sensitiveKey.test(key)) copy.value = protect(copy.value)
+      copy.key = sanitizeText(key)
     }
     if (typeof copy.description === 'string') copy.description = sanitizeText(copy.description)
     return copy
@@ -85,8 +89,14 @@ function sanitizeAuth(value: unknown): unknown {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value
   const auth = { ...(value as Record<string, unknown>) }
   if (auth.type === 'bearer') auth.token = protect(auth.token)
-  if (auth.type === 'basic') auth.password = protect(auth.password)
-  if (auth.type === 'api-key') auth.value = protect(auth.value)
+  if (auth.type === 'basic') {
+    auth.username = typeof auth.username === 'string' ? sanitizeText(auth.username) : auth.username
+    auth.password = protect(auth.password)
+  }
+  if (auth.type === 'api-key') {
+    auth.value = protect(auth.value)
+    if (typeof auth.key === 'string') auth.key = sanitizeText(auth.key)
+  }
   return auth
 }
 
@@ -96,7 +106,7 @@ function sanitizeJsonValue(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value
   return Object.fromEntries(
     Object.entries(value).map(([key, child]) => [
-      key,
+      sanitizeText(key),
       sensitiveKey.test(key) ? protect(child) : sanitizeJsonValue(child),
     ]),
   )
@@ -137,6 +147,9 @@ function sanitizeText(content: string): string {
     .replace(/\/(?:Users|home|tmp|var|opt|etc)\/[^\r\n\s"',;]+/g, REDACTED)
 }
 
+export const sanitizeTextForOutput = sanitizeText
+export const isSensitiveOutputKey = (value: string): boolean => sensitiveKey.test(value)
+
 function sanitizeBody(value: unknown): unknown {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value
   const body = { ...(value as Record<string, unknown>) }
@@ -155,8 +168,10 @@ function sanitizeBody(value: unknown): unknown {
       if (copy.kind === 'file') copy.fileRef = null
       if (typeof copy.filename === 'string') copy.filename = sanitizeText(copy.filename)
       if (typeof copy.description === 'string') copy.description = sanitizeText(copy.description)
-      if (copy.kind === 'text' && typeof copy.key === 'string' && sensitiveKey.test(copy.key)) {
-        copy.textValue = protect(copy.textValue)
+      if (typeof copy.key === 'string') {
+        const key = copy.key
+        if (copy.kind === 'text' && sensitiveKey.test(key)) copy.textValue = protect(copy.textValue)
+        copy.key = sanitizeText(key)
       }
       return copy
     })
