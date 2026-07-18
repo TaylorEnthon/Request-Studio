@@ -39,6 +39,14 @@ describe('request export file safety', () => {
     expect(readdirSync(root).filter((name) => name.endsWith('.tmp'))).toEqual([])
   })
 
+  it('atomically writes iterable JSON chunks', async () => {
+    const { root, userData } = setup()
+    const destination = join(root, 'workspace.json')
+    await writeExportFileAtomic(destination, ['{"format":', '"request-studio.workspace"}\n'], userData)
+    expect(readFileSync(destination, 'utf8')).toBe('{"format":"request-studio.workspace"}\n')
+    expect(readdirSync(root).filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
+
   it('rejects destinations inside userData', async () => {
     const { userData } = setup()
     await expect(

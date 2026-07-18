@@ -8,6 +8,7 @@ import StreamHistoryPanel from './StreamHistoryPanel'
 import ExperimentWorkspace from './ExperimentWorkspace'
 import CurlImportPanel from './CurlImportPanel'
 import RequestExportPanel from './RequestExportPanel'
+import WorkspaceExportPanel from './WorkspaceExportPanel'
 import CodeGenerationPanel from './CodeGenerationPanel'
 import { httpRequestDraftSchema } from '../shared/schemas/http'
 import {
@@ -81,6 +82,7 @@ export default function App() {
     [showTools, setShowTools] = useState(false),
     [showCurlImport, setShowCurlImport] = useState(false),
     [showRequestExport, setShowRequestExport] = useState(false),
+    [showWorkspaceExport, setShowWorkspaceExport] = useState(false),
     [showCodeGeneration, setShowCodeGeneration] = useState(false),
     [executionId, setExecutionId] = useState(''),
     [executionState, setExecutionState] = useState('idle'),
@@ -383,6 +385,15 @@ export default function App() {
                 role="menuitem"
                 onClick={() => {
                   setShowTools(false)
+                  setShowWorkspaceExport(true)
+                }}
+              >
+                Export Workspace...
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setShowTools(false)
                   setShowCodeGeneration(true)
                 }}
               >
@@ -536,6 +547,13 @@ export default function App() {
           requests={requests}
           initialRequestId={selected?.id ?? ''}
           onClose={() => setShowRequestExport(false)}
+        />
+      )}
+      {showWorkspaceExport && (
+        <WorkspaceExportPanel
+          workspaces={workspaces}
+          initialWorkspaceId={workspace}
+          onClose={() => setShowWorkspaceExport(false)}
         />
       )}
       {showCodeGeneration && (

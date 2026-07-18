@@ -16,7 +16,7 @@ export const sanitizeExportFilename = (value: string): string => {
 
 export async function writeExportFileAtomic(
   destination: string,
-  content: string,
+  content: string | Iterable<string>,
   userData: string,
 ): Promise<void> {
   const output = resolve(destination)
