@@ -129,6 +129,7 @@ describe('code generation contract', () => {
     expect(first.content).toContain('{{TOKEN}}')
     expect(first.warnings).toContainEqual({
       code: 'sanitized-values',
+      severity: 'warning',
       message: 'Sensitive values were redacted.',
     })
     expect(JSON.stringify(first)).not.toContain('raw-generator-secret')
@@ -228,5 +229,7 @@ describe('code generation contract', () => {
       'javascript-fetch',
     )
     expect(result.warnings.map(({ code }) => code)).toContain(warningCode)
+    expect(result.warnings.every(({ severity }) => severity === 'info' || severity === 'warning')).toBe(true)
   })
+
 })

@@ -30,6 +30,8 @@ describe('SSE Fetch generator', () => {
 
     expect(content).toContain('const response = await fetch("https://api.example.com/events", {')
     expect(content).toContain('  method: "GET",')
+    expect(content).toContain('const controller = new AbortController()')
+    expect(content).toContain('  signal: controller.signal,')
     expect(content).toContain('if (!response.ok) throw new Error(`SSE request failed: ${response.status}`)')
     expect(content).toContain('if (!response.body) throw new Error("SSE response body is unavailable")')
     expect(content).toContain('const reader = response.body.getReader()')
@@ -37,6 +39,10 @@ describe('SSE Fetch generator', () => {
     expect(content).toContain('while (true) {')
     expect(content).toContain('  const { done, value } = await reader.read()')
     expect(content).toContain('  if (done) break')
+    expect(content).toContain('buffer += decoder.decode(value, { stream: true })')
+    expect(content).toContain('const retry = fields.get("retry")')
+    expect(content).toContain('console.log({ event, data, id, retry })')
+    expect(content).toContain('// Use retry as the delay before reconnecting after a disconnect.')
   })
 
   it('generates POST headers and body', () => {
@@ -53,7 +59,7 @@ describe('SSE Fetch generator', () => {
     expect(content).toContain('  method: "POST",')
     expect(content).toContain('    "X-Client": "Request Studio",')
     expect(content).toContain('    "Content-Type": "application/json",')
-    expect(content).toContain('  body: "{\\"topic\\":\\"alerts\\"}",')
+    expect(content).toContain('  body: JSON.stringify({')
   })
 
   it('generates browser Fetch Basic authorization without resolving its placeholder', () => {

@@ -31,7 +31,7 @@ This avoids changing the independent request-export contract. Safe degradations 
 - Python requests uses `json=json.loads(...)` for JSON, `data=` for text/form data, and calls `raise_for_status()`.
 - Query parameters, enabled headers, Bearer auth, Basic auth, and API-key auth continue to be normalized before adapter selection.
 
-JSON parsing is attempted only for bodies declared as JSON. Invalid JSON stays a deterministic string and produces a warning rather than causing code generation to fail.
+JSON parsing occurs only after the existing asset sanitizer has validated a body declared as JSON. Invalid assets remain rejected at that boundary.
 
 ## SSE output
 

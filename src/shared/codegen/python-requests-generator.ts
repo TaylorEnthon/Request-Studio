@@ -9,6 +9,7 @@ const pythonString = (value: string): string =>
 
 export function generatePythonRequests(model: HttpCodeGenerationModel): string {
   const lines = [
+    ...(model.body?.kind === 'json' ? ['import json'] : []),
     'import requests',
     '',
     'response = requests.request(',
@@ -27,7 +28,11 @@ export function generatePythonRequests(model: HttpCodeGenerationModel): string {
       `    auth=(${pythonString(model.basicAuth.username)}, ${pythonString(model.basicAuth.password)}),`,
     )
   }
-  if (model.body) lines.push(`    data=${pythonString(model.body.content)},`)
-  lines.push(')')
+  if (model.body?.kind === 'json') {
+    lines.push(`    json=json.loads(${pythonString(model.body.content)}),`)
+  } else if (model.body) {
+    lines.push(`    data=${pythonString(model.body.content)},`)
+  }
+  lines.push(')', 'response.raise_for_status()')
   return lines.join('\n')
 }

@@ -27,9 +27,9 @@
 
 **Interfaces:**
 - Produces: `CodeGenerationWarning` with `code`, `severity`, and `message`.
-- Produces: HTTP-like body content normalized as parsed JSON when valid and a deterministic string plus `invalid-json-body` warning otherwise.
+- Produces: HTTP-like body content normalized as parsed JSON after asset validation.
 
-- [ ] Write failing model and UI tests asserting warning severity, JSON normalization, invalid-JSON diagnostics, and unchanged redaction.
+- [ ] Write failing model and UI tests asserting warning severity, JSON normalization, and unchanged redaction.
 - [ ] Run `npm test -- src/shared/codegen/code-generation.test.ts src/renderer/CodeGenerationPanel.test.tsx --run` and confirm failures concern the missing contract.
 - [ ] Add the codegen-local warning type, warning helper, JSON body representation, and severity-aware UI rendering.
 - [ ] Re-run the focused tests and confirm they pass.

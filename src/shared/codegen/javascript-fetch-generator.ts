@@ -18,7 +18,14 @@ export function generateJavaScriptFetch(model: HttpCodeGenerationModel): string 
     }
     lines.push('  },')
   }
-  if (model.body) lines.push(`  body: ${JSON.stringify(model.body.content)},`)
-  lines.push('});')
+  if (model.body?.kind === 'json') {
+    const json = JSON.stringify(model.body.value, null, 2).split('\n')
+    lines.push(`  body: JSON.stringify(${json[0]}`)
+    lines.push(...json.slice(1).map((line) => `  ${line}`))
+    lines[lines.length - 1] += '),'
+  } else if (model.body) {
+    lines.push(`  body: ${JSON.stringify(model.body.content)},`)
+  }
+  lines.push('});', 'if (!response.ok) throw new Error(`Request failed: ${response.status} ${response.statusText}`);')
   return lines.join('\n')
 }

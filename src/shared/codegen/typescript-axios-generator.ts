@@ -21,7 +21,14 @@ export function generateTypeScriptAxios(model: HttpCodeGenerationModel): string 
     lines.push(`    password: ${JSON.stringify(model.basicAuth.password)},`)
     lines.push('  },')
   }
-  if (model.body) lines.push(`  data: ${JSON.stringify(model.body.content)},`)
+  if (model.body?.kind === 'json') {
+    const json = JSON.stringify(model.body.value, null, 2).split('\n')
+    lines.push(`  data: ${json[0]}`)
+    lines.push(...json.slice(1).map((line) => `  ${line}`))
+    lines[lines.length - 1] += ','
+  } else if (model.body) {
+    lines.push(`  data: ${JSON.stringify(model.body.content)},`)
+  }
   lines.push('})')
   return lines.join('\n')
 }

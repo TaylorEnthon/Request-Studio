@@ -1,7 +1,6 @@
 import type { RequestAssetV1 } from '../assets/request-asset'
 import {
   sanitizeRequestAssetForOutput,
-  type ExportWarning,
 } from '../assets/request-export'
 import { generateJavaScriptFetch } from './javascript-fetch-generator'
 import { generatePythonRequests } from './python-requests-generator'
@@ -22,10 +21,16 @@ export type CodeGeneratorCapability = Readonly<{
   supportedProtocols: readonly RequestAssetV1['protocol'][]
 }>
 
+export type CodeGenerationWarning = Readonly<{
+  code: string
+  severity: 'info' | 'warning'
+  message: string
+}>
+
 export type GeneratedCode = Readonly<{
   language: CodeGenerationLanguage
   content: string
-  warnings: readonly ExportWarning[]
+  warnings: readonly CodeGenerationWarning[]
 }>
 
 export type HttpCodeGenerationModel = Readonly<{
@@ -33,11 +38,11 @@ export type HttpCodeGenerationModel = Readonly<{
   url: string
   headers: readonly Readonly<{ key: string; value: string }>[]
   basicAuth: Readonly<{ username: string; password: string }> | null
-  body: Readonly<{
-    kind: 'json' | 'text' | 'form-urlencoded'
-    content: string
-  }> | null
-  warnings: readonly ExportWarning[]
+  body:
+    | Readonly<{ kind: 'json'; content: string; value: unknown }>
+    | Readonly<{ kind: 'text' | 'form-urlencoded'; content: string }>
+    | null
+  warnings: readonly CodeGenerationWarning[]
 }>
 
 export type SseCodeGenerationModel = Readonly<{
@@ -46,13 +51,13 @@ export type SseCodeGenerationModel = Readonly<{
   headers: readonly Readonly<{ key: string; value: string }>[]
   basicAuth: HttpCodeGenerationModel['basicAuth']
   body: HttpCodeGenerationModel['body']
-  warnings: readonly ExportWarning[]
+  warnings: readonly CodeGenerationWarning[]
 }>
 
 export type WebSocketCodeGenerationModel = Readonly<{
   url: string
   subprotocols: readonly string[]
-  warnings: readonly ExportWarning[]
+  warnings: readonly CodeGenerationWarning[]
 }>
 
 type CodeGenerationModel =
@@ -74,6 +79,12 @@ const encodePart = (value: string): string =>
       /^{{[A-Za-z_][A-Za-z0-9_]*}}$/.test(part) ? part : encodeURIComponent(part),
     )
     .join('')
+
+const warning = (
+  code: string,
+  message: string,
+  severity: CodeGenerationWarning['severity'] = 'warning',
+): CodeGenerationWarning => ({ code, severity, message })
 
 function withQuery(url: string, entries: readonly QueryEntry[]): string {
   const enabled = entries.filter(({ enabled }) => enabled)
@@ -118,22 +129,19 @@ function normalizeHttpLikeRequest(
     }
   }
 
-  const warnings: ExportWarning[] = []
+  const warnings: CodeGenerationWarning[] = []
   const hasContentType = () =>
     headers.some(({ key }) => key.toLowerCase() === 'content-type')
   let body: HttpCodeGenerationModel['body'] = null
   if (request.body.type === 'json') {
     if (!hasContentType()) headers.push({ key: 'Content-Type', value: 'application/json' })
-    body = { kind: 'json', content: request.body.content }
+    body = { kind: 'json', content: request.body.content, value: JSON.parse(request.body.content) }
   } else if (request.body.type === 'text') {
     if (request.body.contentType && !hasContentType()) {
       headers.push({ key: 'Content-Type', value: request.body.contentType })
     }
     body = { kind: 'text', content: request.body.content }
-    warnings.push({
-      code: 'opaque-text',
-      message: 'Review unstructured text for opaque sensitive values.',
-    })
+    warnings.push(warning('opaque-text', 'Review unstructured text for opaque sensitive values.', 'info'))
   } else if (request.body.type === 'form-urlencoded') {
     if (!hasContentType()) {
       headers.push({
@@ -149,17 +157,11 @@ function normalizeHttpLikeRequest(
         .join('&'),
     }
   } else if (request.body.type === 'multipart' || request.body.type === 'binary') {
-    warnings.push({
-      code: 'file-content-omitted',
-      message: 'Local file content was omitted.',
-    })
+    warnings.push(warning('file-content-omitted', 'Local file content was omitted.'))
   }
 
   if (hasRedactedValues) {
-    warnings.unshift({
-      code: 'sanitized-values',
-      message: 'Sensitive values were redacted.',
-    })
+    warnings.unshift(warning('sanitized-values', 'Sensitive values were redacted.'))
   }
   return {
     url: withQuery(request.url, query),
@@ -197,8 +199,8 @@ function createWebSocketModel(
     key,
     value,
   }))
-  const omitsHeaders =
-    request.headers.some(({ enabled }) => enabled) ||
+  const omitsHeaders = request.headers.some(({ enabled }) => enabled)
+  const omitsAuthentication =
     request.auth.type === 'bearer' ||
     request.auth.type === 'basic' ||
     (request.auth.type === 'api-key' && request.auth.placement === 'header')
@@ -207,18 +209,15 @@ function createWebSocketModel(
     query.push({ enabled: true, key: request.auth.key, value: request.auth.value })
   }
 
-  const warnings: ExportWarning[] = []
+  const warnings: CodeGenerationWarning[] = []
   if (JSON.stringify(asset).includes('[REDACTED]')) {
-    warnings.push({
-      code: 'sanitized-values',
-      message: 'Sensitive values were redacted.',
-    })
+    warnings.push(warning('sanitized-values', 'Sensitive values were redacted.'))
   }
   if (omitsHeaders) {
-    warnings.push({
-      code: 'browser-websocket-headers-omitted',
-      message: 'Browser WebSocket does not support custom headers or header-based authentication.',
-    })
+    warnings.push(warning('browser-websocket-headers-omitted', 'Browser WebSocket does not support custom headers.'))
+  }
+  if (omitsAuthentication) {
+    warnings.push(warning('browser-websocket-auth-unsupported', 'Browser WebSocket does not support header-based authentication.'))
   }
 
   return {

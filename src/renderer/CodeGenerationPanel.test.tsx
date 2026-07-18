@@ -11,7 +11,7 @@ const requests = [
 const generated = {
   language: 'javascript-fetch',
   content: "fetch('https://api.example.com', { headers: { Authorization: 'Bearer {{TOKEN}}' } })",
-  warnings: [{ code: 'sanitized-values', message: 'Sensitive values were redacted.' }],
+  warnings: [{ code: 'sanitized-values', severity: 'warning', message: 'Sensitive values were redacted.' }],
 }
 const capabilities = [
   { language: 'javascript-fetch', displayName: 'JavaScript Fetch', supportedProtocols: ['http'] },
@@ -58,6 +58,7 @@ it('selects a language and renders only the sanitized generated preview', async 
 
   expect(await screen.findByLabelText('Generated code')).toHaveTextContent('{{TOKEN}}')
   expect(screen.getByText('Sensitive values were redacted.')).toBeInTheDocument()
+  expect(screen.getByText('Sensitive values were redacted.')).toHaveAttribute('data-severity', 'warning')
   expect(preview).toHaveBeenCalledWith({
     workspaceId: 'workspace-id',
     requestId: 'database-http-id',
