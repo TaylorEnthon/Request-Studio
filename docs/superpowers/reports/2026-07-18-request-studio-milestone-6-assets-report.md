@@ -2,7 +2,7 @@
 
 ## 1. Final conclusion
 
-Milestone 6 delivers a complete local API asset workflow: versioned Request assets, safe cURL import, Request export, deterministic multi-protocol code previews, and one-way Workspace JSON export. No Milestone 7 capability is included. Official remote closure evidence is recorded in **Final Main Closure** after the closure PR and final `main` CI complete.
+Milestone 6 delivers a complete local API asset workflow: versioned Request assets, safe cURL import, Request export, deterministic multi-protocol code previews, and one-way Workspace JSON export. No Milestone 7 capability is included. The product closure PR and its final `main` CI completed successfully; the exact remote evidence is recorded in **Final Main Closure**.
 
 ## 2. Git state at closure start
 
@@ -151,4 +151,12 @@ Recommend **Workspace Import & Portable Bundles** before OpenAPI import or deskt
 
 ## 21. Final Main Closure
 
-Pending the closure PR, required Windows checks, squash merge, final `main` CI, and local fast-forward. The final delivery update must record PR number, squash SHA, PR Run/Job, final main Run/Job, durations, branch/worktree cleanup, `HEAD = origin/main`, `0/0`, and clean working tree.
+- PR [#12 — Milestone 6 — Final Closure & Product Verification](https://github.com/TaylorEnthon/Request-Studio/pull/12) was squash merged with no conflict.
+- Squash commit: `b074fadb440a7f5222b1361c435f9d260cb9e102`.
+- PR CI: workflow `CI`, Run `29644984294`, Job `88081625375`, head `c011b583a240fe6b5c9b3e595266cc4328b4a0ee`, `success`, 2 minutes 22 seconds (`2026-07-18T12:48:14Z`–`12:50:36Z`).
+- Final product `main` CI: workflow `CI`, Run `29645158986`, Job `88082076378`, commit `b074fadb440a7f5222b1361c435f9d260cb9e102`, `success`, 2 minutes 26 seconds (`2026-07-18T12:53:59Z`–`12:56:25Z`).
+- Both Jobs completed `npm ci`, lint, typecheck, tests, build, database smoke, media tests/smoke, streaming smoke, assets smoke, Electron smoke, and the post-Electron database test with no skipped required step and no `continue-on-error`.
+- Local `main` was fast-forwarded to the squash commit before this documentation-only closure update. The pre-existing diverged B2.3 worktree remains preserved because it is not safely merged.
+- This documentation-only update changes no product code, schema, IPC, UI, execution engine, or Milestone 7 scope. Its final merge SHA and CI are recorded in the delivery response because a commit cannot contain evidence of its own future merge.
+
+With PR #12 and its final `main` CI successful, the Milestone 6 product scope is officially closed. The final delivery procedure additionally verifies `HEAD = origin/main`, ahead/behind `0/0`, a clean working tree, and cleanup of only safely merged closure worktrees/branches.
