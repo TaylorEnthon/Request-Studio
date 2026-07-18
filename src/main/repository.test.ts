@@ -88,3 +88,27 @@ it('rolls back variables when Saved Request creation fails', () => {
   expect(()=>repo.importCurl(plan)).toThrow('cURL import could not be saved.')
   expect(db.prepare('SELECT * FROM environment_variables').all()).toHaveLength(0)
 })
+
+it('reads only the five allowed workspace export source groups', () => {
+  const db=createDatabase(':memory:');databases.push(db);const repo=new Repository(db)
+  repo.create('workspaces',{id:'w',name:'Workspace'})
+  repo.create('collections',{id:'c',workspace_id:'w',name:'API'})
+  repo.create('environments',{id:'e',workspace_id:'w',name:'Local'})
+  repo.create('environment_variables',{id:'v',environment_id:'e',key:'TOKEN',value:'raw-secret',is_secret:1,description:''})
+  repo.create('saved_requests',{id:'r',workspace_id:'w',collection_id:'c',name:'Users',protocol:'http',method:'GET',url:'https://example.test',description:''})
+  db.prepare("INSERT INTO request_history(id,workspace_id,saved_request_id,request_name,method,url_template,resolved_url_redacted,started_at,request_snapshot_json,created_at) VALUES('history-id','w','r','Users','GET','','','x','{}','x')").run()
+  db.prepare("INSERT INTO response_resources(id,history_id,source,kind,path,byte_length,suggested_filename,created_at) VALUES('resource-id','history-id','managed-response-file','binary','C:\\private.bin',1,'private.bin','x')").run()
+  db.prepare("INSERT INTO experiments(id,workspace_id,name,description,protocol,created_at,updated_at) VALUES('experiment-id','w','Experiment','','http','x','x')").run()
+
+  const result=repo.getWorkspaceExportSource('w')
+  expect(result).toMatchObject({
+    workspace:{id:'w',name:'Workspace'},
+    collections:[{id:'c',workspace_id:'w',name:'API'}],
+    environments:[{id:'e',workspace_id:'w',name:'Local'}],
+    variables:[{id:'v',environment_id:'e',key:'TOKEN'}],
+    requests:[{id:'r',workspace_id:'w',collection_id:'c',name:'Users'}],
+  })
+  expect(Object.keys(result!)).toEqual(['workspace','collections','requests','environments','variables'])
+  expect(JSON.stringify(result)).not.toMatch(/history-id|resource-id|experiment-id|private\.bin|created_at|updated_at/)
+  expect(repo.getWorkspaceExportSource('missing')).toBeUndefined()
+})

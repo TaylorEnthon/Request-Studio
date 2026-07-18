@@ -41,7 +41,7 @@ Requests reuse `mapSavedRequestToExportAsset`, preserving placeholders while red
 
 ## Serializer
 
-`serializeWorkspaceExportV1Chunks()` validates the bundle and yields deterministic compact JSON in structural and per-item chunks. A consumer can write chunks directly without allocating a second whole-bundle string. E1 also exposes a small join helper for tests and bounded callers.
+`serializeWorkspaceExportV1Chunks()` accepts the validated `WorkspaceExportV1` produced by the mapper and yields deterministic compact JSON in structural and per-item chunks. A consumer can write chunks directly without allocating a second whole-bundle string. E1 also exposes a small join helper for tests and bounded callers.
 
 The SQLite snapshot and validated bundle remain in memory because the current repository uses synchronous `better-sqlite3` array reads. Database paging and direct file streaming are deferred until a measured workspace size requires them.
 

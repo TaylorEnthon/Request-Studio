@@ -137,6 +137,9 @@ function sanitizeText(content: string): string {
     .replace(/\/(?:Users|home|tmp|var|opt|etc)\/[^\r\n\s"',;]+/g, REDACTED)
 }
 
+export const sanitizeTextForOutput = sanitizeText
+export const isSensitiveOutputKey = (value: string): boolean => sensitiveKey.test(value)
+
 function sanitizeBody(value: unknown): unknown {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value
   const body = { ...(value as Record<string, unknown>) }

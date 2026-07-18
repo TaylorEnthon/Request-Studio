@@ -45,7 +45,7 @@
 
 - [ ] Write failing tests for byte-identical repeated serialization, parseable chunk output, and 1,000-request serialization without a whole-bundle chunk.
 - [ ] Run the focused test and verify the serializer exports are missing.
-- [ ] Implement a generator that validates once and yields fixed object fields plus one array item per chunk.
+- [ ] Implement a generator that accepts mapper-validated input and yields fixed object fields plus one array item per chunk.
 - [ ] Re-run the focused test and confirm pass.
 
 ### Task 3: Read-only SQLite source snapshot
