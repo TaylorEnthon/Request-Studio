@@ -17,6 +17,7 @@
     "smoke:database": "tsx scripts/database-smoke.ts",
     "smoke:electron": "node scripts/electron-smoke.mjs",
     "smoke:media": "tsx scripts/media-smoke.ts",
+    "smoke:assets": "tsx scripts/assets-smoke.ts",
     "test:http": "vitest run src/main/http src/main/history src/shared/schemas/http.test.ts",
     "test:media": "vitest run src/main/response src/renderer/HttpResponsePanel.test.tsx",
     "test:streaming": "vitest run src/main/websocket src/main/sse src/main/streaming src/shared/streaming",
