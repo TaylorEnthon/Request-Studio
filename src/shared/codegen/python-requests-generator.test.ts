@@ -31,6 +31,7 @@ describe('Python requests generator', () => {
         '    "GET",',
         '    "https://api.example.com/users",',
         ')',
+        'response.raise_for_status()',
       ].join('\n'),
     )
   })
@@ -49,6 +50,7 @@ describe('Python requests generator', () => {
 
     expect(result.content).toBe(
       [
+        'import json',
         'import requests',
         '',
         'response = requests.request(',
@@ -59,8 +61,9 @@ describe('Python requests generator', () => {
         '        "Content-Type": "application/json",',
         '    },',
         '    auth=("user", "{{BASIC_PASSWORD}}"),',
-        '    data="{\\"name\\":\\"Ada\\"}",',
+        '    json=json.loads("{\\"name\\":\\"Ada\\"}"),',
         ')',
+        'response.raise_for_status()',
       ].join('\n'),
     )
   })

@@ -10,7 +10,7 @@ type Capability = {
 type Preview = {
   language: Language
   content: string
-  warnings: readonly { code: string; message: string }[]
+  warnings: readonly { code: string; severity: 'info' | 'warning'; message: string }[]
 }
 type Props = {
   workspaceId: string
@@ -183,7 +183,7 @@ export default function CodeGenerationPanel({ workspaceId, requests, initialRequ
           {preview.warnings.length > 0 && (
             <section>
               <h3>Warnings</h3>
-              {preview.warnings.map((warning) => <p className="warning" key={warning.code}>{warning.message}</p>)}
+              {preview.warnings.map((warning) => <p className="warning" data-severity={warning.severity} key={warning.code}>{warning.message}</p>)}
             </section>
           )}
           <pre className="export-content" aria-label="Generated code">{preview.content}</pre>

@@ -92,6 +92,7 @@ function sanitizeAuth(value: unknown): unknown {
 
 function sanitizeJsonValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sanitizeJsonValue)
+  if (typeof value === 'string') return sanitizeText(value)
   if (!value || typeof value !== 'object') return value
   return Object.fromEntries(
     Object.entries(value).map(([key, child]) => [

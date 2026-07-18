@@ -59,7 +59,9 @@ describe('TypeScript Axios generator', () => {
         '    "Authorization": "Bearer {{TOKEN}}",',
         '    "Content-Type": "application/json",',
         '  },',
-        '  data: "{\\"name\\":\\"Ada\\"}",',
+        '  data: {',
+        '    "name": "Ada"',
+        '  },',
         '})',
       ].join('\n'),
     )

@@ -28,6 +28,7 @@ describe('JavaScript Fetch generator', () => {
         'const response = await fetch("https://api.example.com/users", {',
         '  method: "GET",',
         '});',
+        'if (!response.ok) throw new Error(`Request failed: ${response.status} ${response.statusText}`);',
       ].join('\n'),
     )
   })
@@ -56,8 +57,11 @@ describe('JavaScript Fetch generator', () => {
         '    "Authorization": "Bearer {{TOKEN}}",',
         '    "Content-Type": "application/json",',
         '  },',
-        '  body: "{\\"name\\":\\"Ada\\"}",',
+        '  body: JSON.stringify({',
+        '    "name": "Ada"',
+        '  }),',
         '});',
+        'if (!response.ok) throw new Error(`Request failed: ${response.status} ${response.statusText}`);',
       ].join('\n'),
     )
   })
