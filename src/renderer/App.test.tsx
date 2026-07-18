@@ -72,6 +72,25 @@ it('opens and closes Request Export from the Tools menu', async () => {
   expect(screen.queryByRole('dialog', { name: 'Export Request' })).not.toBeInTheDocument()
 })
 
+it('opens and closes Workspace Export from the Tools menu', async () => {
+  window.requestStudio = {
+    workspaces: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'w', name: 'Workspace' }] }) },
+    collections: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    savedRequests: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    experiments: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    workspaceExport: { preview: vi.fn(), save: vi.fn() },
+    streaming: { onEvent: vi.fn() },
+    http: { onExecutionEvent: vi.fn() },
+  }
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Tools' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Export Workspace...' }))
+  expect(screen.getByRole('dialog', { name: 'Export Workspace' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Workspace to export')).toHaveValue('w')
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+  expect(screen.queryByRole('dialog', { name: 'Export Workspace' })).not.toBeInTheDocument()
+})
+
 it('opens and closes Code Generation from the Tools menu with the selected request', async () => {
   window.requestStudio = {
     workspaces: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'w', name: 'Workspace' }] }) },
