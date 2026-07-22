@@ -2,6 +2,15 @@ import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { CurlImportSavePlan } from '../shared/curl/curl-import-save'
 import type { WorkspaceExportSource } from '../shared/assets/workspace-export'
+import {
+  mapWorkspaceImportRequestValues,
+  prepareWorkspaceImportApply,
+  workspaceImportApplyFailure,
+  workspaceImportApplySuccess,
+  type WorkspaceImportApplyRequest,
+  type WorkspaceImportApplyResult,
+} from '../shared/assets/workspace-import-apply'
+import { createWorkspaceImportDryRun, parseWorkspaceImportSource, type WorkspaceImportTargetSnapshot } from '../shared/assets/workspace-import'
 
 const now = () => new Date().toISOString()
 export class Repository {
@@ -61,6 +70,83 @@ export class Repository {
       variables:this.db.prepare(`SELECT v.id,v.environment_id,v.key,v.value,v.is_secret,v.description FROM environment_variables v
         JOIN environments e ON e.id=v.environment_id WHERE e.workspace_id=? ORDER BY v.key,v.id`).all(workspaceId) as WorkspaceExportSource['variables'],
     }
+  }
+  applyWorkspaceImport(input: WorkspaceImportApplyRequest | unknown): WorkspaceImportApplyResult {
+    try {
+      return this.db.transaction((): WorkspaceImportApplyResult => {
+        if(!input||typeof input!=='object'||Array.isArray(input))return workspaceImportApplyFailure('INVALID_PLAN')
+        const request=input as WorkspaceImportApplyRequest
+        const parsed=parseWorkspaceImportSource(request.source)
+        if(!parsed.ok)return parsed
+        if(request.mode!=='create-workspace'&&request.mode!=='merge-into-workspace')return workspaceImportApplyFailure('INVALID_PLAN')
+        if(request.resolutions!==undefined&&!Array.isArray(request.resolutions))return workspaceImportApplyFailure('INVALID_PLAN')
+
+        let targetWorkspaceId:string|undefined
+        let analysis:unknown
+        if(request.mode==='create-workspace'){
+          analysis={mode:request.mode,existingWorkspaceNames:(this.db.prepare('SELECT name FROM workspaces ORDER BY name,id').all() as {name:string}[]).map(({name})=>name)}
+        }else{
+          targetWorkspaceId=request.targetWorkspaceId
+          if(typeof targetWorkspaceId!=='string'||!targetWorkspaceId)return workspaceImportApplyFailure('INVALID_PLAN')
+          const workspace=this.db.prepare('SELECT name FROM workspaces WHERE id=?').get(targetWorkspaceId) as {name:string}|undefined
+          if(!workspace)return {ok:false,error:{code:'TARGET_WORKSPACE_NOT_FOUND',message:'The target Workspace is unavailable.'}}
+          const collections=this.db.prepare('SELECT id,name FROM collections WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {id:string;name:string}[]
+          const environments=this.db.prepare('SELECT id,name FROM environments WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {id:string;name:string}[]
+          const requests=this.db.prepare('SELECT collection_id,name FROM saved_requests WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {collection_id:string;name:string}[]
+          const variables=this.db.prepare(`SELECT v.environment_id,v.key FROM environment_variables v JOIN environments e ON e.id=v.environment_id
+            WHERE e.workspace_id=? ORDER BY v.key,v.id`).all(targetWorkspaceId) as {environment_id:string;key:string}[]
+          const target:WorkspaceImportTargetSnapshot={
+            workspaceName:workspace.name,
+            collections:collections.map(({id,name})=>({name,requests:requests.filter((request)=>request.collection_id===id).map((request)=>request.name)})),
+            environments:environments.map(({id,name})=>({name,variables:variables.filter((variable)=>variable.environment_id===id).map((variable)=>variable.key)})),
+          }
+          analysis={mode:request.mode,target}
+        }
+
+        const dryRun=createWorkspaceImportDryRun(parsed.bundle,analysis)
+        if(!dryRun.ok)return dryRun
+        const prepared=prepareWorkspaceImportApply(parsed.bundle,dryRun.dryRun,request.resolutions)
+        if(!prepared.ok)return prepared
+        const finalDryRun=createWorkspaceImportDryRun(prepared.bundle,analysis)
+        if(!finalDryRun.ok)return finalDryRun
+        if(finalDryRun.dryRun.conflicts.length||finalDryRun.dryRun.operations.some(({status})=>status==='blocked'))return workspaceImportApplyFailure('IMPORT_CONFLICT')
+
+        const workspaceIds=new Map<string,string>()
+        const collectionIds=new Map<string,string>()
+        const environmentIds=new Map<string,string>()
+        if(targetWorkspaceId)workspaceIds.set('workspace',targetWorkspaceId)
+        for(const operation of finalDryRun.dryRun.operations){
+          if(operation.kind==='create-workspace'){
+            const row=this.create('workspaces',{name:prepared.bundle.workspace.name}) as {id:string}
+            workspaceIds.set(operation.sourceRef,row.id)
+          }else if(operation.kind==='create-collection'){
+            const collection=prepared.bundle.collections.find(({ref})=>ref===operation.sourceRef)
+            const workspaceId=workspaceIds.get(operation.parentSourceRef!)
+            if(!collection||!workspaceId)throw new Error('Invalid apply plan')
+            const row=this.create('collections',{workspace_id:workspaceId,name:collection.name}) as {id:string}
+            collectionIds.set(operation.sourceRef,row.id)
+          }else if(operation.kind==='create-environment'){
+            const match=/^environment-(\d+)$/.exec(operation.sourceRef),environment=match&&prepared.bundle.environments[Number(match[1])-1]
+            const workspaceId=workspaceIds.get(operation.parentSourceRef!)
+            if(!environment||!workspaceId)throw new Error('Invalid apply plan')
+            const row=this.create('environments',{workspace_id:workspaceId,name:environment.name}) as {id:string}
+            environmentIds.set(operation.sourceRef,row.id)
+          }else if(operation.kind==='create-variable'){
+            const match=/^environment-(\d+)-variable-(\d+)$/.exec(operation.sourceRef)
+            const variable=match&&prepared.bundle.environments[Number(match[1])-1]?.variables[Number(match[2])-1]
+            const environmentId=environmentIds.get(operation.parentSourceRef!)
+            if(!variable||!environmentId)throw new Error('Invalid apply plan')
+            this.create('environment_variables',{environment_id:environmentId,key:variable.key,value:variable.isSecret?'':variable.value,is_secret:variable.isSecret?1:0,description:variable.description})
+          }else if(operation.kind==='create-request'){
+            const match=/^request-(\d+)$/.exec(operation.sourceRef),request=match&&prepared.bundle.requests[Number(match[1])-1]
+            const workspaceId=workspaceIds.get('workspace'),collectionId=collectionIds.get(operation.parentSourceRef!)
+            if(!request||!workspaceId||!collectionId)throw new Error('Invalid apply plan')
+            this.create('saved_requests',{workspace_id:workspaceId,collection_id:collectionId,...mapWorkspaceImportRequestValues(request.asset)})
+          }else throw new Error('Invalid apply plan')
+        }
+        return workspaceImportApplySuccess(request.mode,prepared.bundle)
+      })()
+    }catch{return workspaceImportApplyFailure('TRANSACTION_FAILED')}
   }
   deleteWorkspace(id: string) {
     this.db.transaction(()=>{this.clearSetting(`selectedEnvironment:${id}`);this.db.prepare('DELETE FROM workspaces WHERE id=?').run(id)})()
