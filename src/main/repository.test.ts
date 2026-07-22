@@ -18,6 +18,25 @@ const setupCurlImport = () => {
   return {db,repo,plan}
 }
 
+const workspaceImportBundle = () => ({
+  format: 'request-studio.workspace', version: 1,
+  workspace: { name: 'Imported Workspace' },
+  collections: [{ ref: 'collection-1', name: 'API' }],
+  requests: [{
+    collectionRef: 'collection-1',
+    asset: {
+      format: 'request-studio.request', version: 1, protocol: 'http', name: 'Users', description: '',
+      request: { method: 'GET', url: 'https://api.example.test/users', params: [], headers: [], auth: { type: 'none' }, body: { type: 'none' }, settings: { timeoutMs: 30000 } },
+    },
+  }],
+  environments: [{ name: 'Local', variables: [{ key: 'TOKEN', value: '', isSecret: true, description: '' }] }],
+})
+
+const setupWorkspaceImport = () => {
+  const db=createDatabase(':memory:');databases.push(db);const repo=new Repository(db)
+  return {db,repo,source:JSON.stringify(workspaceImportBundle())}
+}
+
 it('creates, updates, lists, and deletes a workspace', () => {
   const db=createDatabase(':memory:');databases.push(db);const repo=new Repository(db)
   const created=repo.create('workspaces',{name:'One'}) as {id:string}
@@ -111,4 +130,71 @@ it('reads only the five allowed workspace export source groups', () => {
   expect(Object.keys(result!)).toEqual(['workspace','collections','requests','environments','variables'])
   expect(JSON.stringify(result)).not.toMatch(/history-id|resource-id|experiment-id|private\.bin|created_at|updated_at/)
   expect(repo.getWorkspaceExportSource('missing')).toBeUndefined()
+})
+
+it('applies a clean Workspace bundle atomically with private sourceRef mappings', () => {
+  const {db,repo,source}=setupWorkspaceImport()
+  const first=repo.applyWorkspaceImport({source,mode:'create-workspace'})
+  expect(first).toEqual({ok:true,apply:{format:'request-studio.workspace-import-apply',version:1,mode:'create-workspace',summary:{collectionCount:1,requestCount:1,environmentCount:1,variableCount:1}}})
+  expect(db.prepare('SELECT name FROM workspaces').all()).toEqual([{name:'Imported Workspace'}])
+  expect(db.prepare('SELECT c.name collection_name,r.name request_name FROM saved_requests r JOIN collections c ON c.id=r.collection_id').all()).toEqual([{collection_name:'API',request_name:'Users'}])
+  expect(db.prepare('SELECT e.name environment_name,v.key,v.value,v.is_secret FROM environment_variables v JOIN environments e ON e.id=v.environment_id').all()).toEqual([{environment_name:'Local',key:'TOKEN',value:'',is_secret:1}])
+  expect(JSON.stringify(first)).not.toMatch(/workspace_id|collection_id|environment_id|fixture-secret-value/)
+})
+
+it('merges only after an explicit supported rename and leaves existing rows unchanged', () => {
+  const {db,repo,source}=setupWorkspaceImport()
+  repo.create('workspaces',{id:'target',name:'Target'})
+  repo.create('collections',{id:'existing-c',workspace_id:'target',name:'API'})
+  repo.create('environments',{id:'existing-e',workspace_id:'target',name:'Local'})
+  const result=repo.applyWorkspaceImport({source,mode:'merge-into-workspace',targetWorkspaceId:'target',resolutions:[
+    {sourceRef:'collection-1',strategy:'rename',name:'Imported API'},
+    {sourceRef:'environment-1',strategy:'rename',name:'Imported Local'},
+  ]})
+  expect(result).toMatchObject({ok:true,apply:{mode:'merge-into-workspace'}})
+  expect(db.prepare('SELECT name FROM collections ORDER BY name').all()).toEqual([{name:'API'},{name:'Imported API'}])
+  expect(db.prepare('SELECT name FROM environments ORDER BY name').all()).toEqual([{name:'Imported Local'},{name:'Local'}])
+})
+
+it('rejects unresolved, blocked, unsupported, and multiple conflicts before writing', () => {
+  const {db,repo,source}=setupWorkspaceImport()
+  repo.create('workspaces',{id:'target',name:'Target'})
+  repo.create('collections',{id:'existing-c',workspace_id:'target',name:'API'})
+  repo.create('environments',{id:'existing-e',workspace_id:'target',name:'Local'})
+  expect(repo.applyWorkspaceImport({source,mode:'merge-into-workspace',targetWorkspaceId:'target'})).toMatchObject({ok:false,error:{code:'IMPORT_CONFLICT'}})
+  expect(repo.applyWorkspaceImport({source,mode:'merge-into-workspace',targetWorkspaceId:'target',resolutions:[{sourceRef:'collection-1',strategy:'merge'}]})).toMatchObject({ok:false,error:{code:'UNSUPPORTED_STRATEGY'}})
+  expect(db.prepare("SELECT count(*) count FROM collections WHERE name='Imported API'").get()).toEqual({count:0})
+})
+
+it.each([
+  ['workspace', "CREATE TRIGGER reject_workspace BEFORE INSERT ON workspaces BEGIN SELECT RAISE(ABORT, 'fixture-secret-value'); END"],
+  ['request', "CREATE TRIGGER reject_request BEFORE INSERT ON saved_requests BEGIN SELECT RAISE(ABORT, 'fixture-secret-value'); END"],
+  ['variable', "CREATE TRIGGER reject_variable BEFORE INSERT ON environment_variables BEGIN SELECT RAISE(ABORT, 'fixture-secret-value'); END"],
+])('rolls back every imported row when %s creation fails', (_label, trigger) => {
+  const {db,repo,source}=setupWorkspaceImport();db.exec(trigger)
+  const result=repo.applyWorkspaceImport({source,mode:'create-workspace'})
+  expect(result).toEqual({ok:false,error:{code:'TRANSACTION_FAILED',message:'Workspace import transaction failed.'}})
+  expect(db.prepare('SELECT count(*) count FROM workspaces').get()).toEqual({count:0})
+  expect(db.prepare('SELECT count(*) count FROM collections').get()).toEqual({count:0})
+  expect(db.prepare('SELECT count(*) count FROM saved_requests').get()).toEqual({count:0})
+  expect(db.prepare('SELECT count(*) count FROM environments').get()).toEqual({count:0})
+  expect(db.prepare('SELECT count(*) count FROM environment_variables').get()).toEqual({count:0})
+  expect(JSON.stringify(result)).not.toMatch(/fixture-secret-value|CREATE TRIGGER|saved_requests/)
+})
+
+it('rejects unsafe paths and invalid target Workspaces without writing or leaking input', () => {
+  const {db,repo}=setupWorkspaceImport(), unsafe=workspaceImportBundle()
+  unsafe.workspace.name='C:\\Users\\Example\\secret.txt'
+  const path=repo.applyWorkspaceImport({source:JSON.stringify(unsafe),mode:'create-workspace'})
+  expect(path).toMatchObject({ok:false,error:{code:'UNSAFE_IMPORT_CONTENT'}})
+  expect(JSON.stringify(path)).not.toMatch(/Users|secret\.txt|file:\/\/\//)
+  expect(repo.applyWorkspaceImport({source:JSON.stringify(workspaceImportBundle()),mode:'merge-into-workspace',targetWorkspaceId:'missing'})).toMatchObject({ok:false,error:{code:'TARGET_WORKSPACE_NOT_FOUND'}})
+  expect(db.prepare('SELECT count(*) count FROM workspaces').get()).toEqual({count:0})
+})
+
+it('rejects malformed apply contracts with a fixed error', () => {
+  const {repo,source}=setupWorkspaceImport()
+  expect(repo.applyWorkspaceImport(null)).toMatchObject({ok:false,error:{code:'INVALID_PLAN'}})
+  expect(repo.applyWorkspaceImport({source,mode:'merge-into-workspace',targetWorkspaceId:''})).toMatchObject({ok:false,error:{code:'INVALID_PLAN'}})
+  expect(repo.applyWorkspaceImport({source,mode:'create-workspace',resolutions:'rename'})).toMatchObject({ok:false,error:{code:'INVALID_PLAN'}})
 })
