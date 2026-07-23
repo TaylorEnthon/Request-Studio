@@ -120,6 +120,7 @@ The current A2 target-snapshot construction is embedded inside `Repository.apply
 - Parse with A1 `parseWorkspaceImportSource()`.
 - Build the live create/merge analysis from SQLite.
 - Run A1 `createWorkspaceImportDryRun()`.
+- Run the existing A2 `prepareWorkspaceImportApply()` safety gate with no resolutions before returning any display text.
 
 The public preview method is read-only. Apply continues to own validation, resolution preparation, final dry run, and all writes inside its existing transaction. No new service, interface, or import engine is introduced.
 
@@ -141,6 +142,7 @@ Renderer
 - Preview IDs are random and scoped with `WeakMap<object, ...>` by sender.
 - Only one latest preview is retained per sender, bounding Main memory to one A1-sized source.
 - Sensitive variable values stay sanitized by the A1 contract; A2 writes secret slots with empty values.
+- Unsafe imported text is rejected by the existing A2 safety gate before names or conflict details reach Renderer.
 - Errors and logs never include source text, credentials, or local paths.
 - Merge ownership is enforced by looking up the target Workspace in Main/Repository, not by trusting Renderer metadata.
 
