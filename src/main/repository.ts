@@ -102,7 +102,7 @@ export class Repository {
     const dryRun=this.analyzeWorkspaceImport(parsed.bundle,mode,targetWorkspaceId)
     if(!dryRun.ok)return dryRun
     const safe=prepareWorkspaceImportApply(parsed.bundle,dryRun.dryRun)
-    return safe.ok?dryRun:safe
+    return safe.ok?{ok:true as const,bundle:safe.bundle,dryRun:dryRun.dryRun}:safe
   }
   applyWorkspaceImport(input: WorkspaceImportApplyRequest | unknown): WorkspaceImportApplyResult {
     try {
