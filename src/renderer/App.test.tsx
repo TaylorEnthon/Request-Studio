@@ -91,6 +91,65 @@ it('opens and closes Workspace Export from the Tools menu', async () => {
   expect(screen.queryByRole('dialog', { name: 'Export Workspace' })).not.toBeInTheDocument()
 })
 
+it('opens Workspace Import without an existing Workspace and keeps scoped tools disabled', async () => {
+  window.requestStudio = {
+    workspaces: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    workspaceImport: { preview: vi.fn(), apply: vi.fn() },
+    streaming: { onEvent: vi.fn() },
+    http: { onExecutionEvent: vi.fn() },
+  }
+  render(<App />)
+  const tools = await screen.findByRole('button', { name: 'Tools' })
+  expect(tools).toBeEnabled()
+  fireEvent.click(tools)
+  expect(screen.getByRole('menuitem', { name: 'Import Workspace...' })).toBeEnabled()
+  expect(screen.getByRole('menuitem', { name: 'Import cURL...' })).toBeDisabled()
+  expect(screen.getByRole('menuitem', { name: 'Export Request...' })).toBeDisabled()
+  expect(screen.getByRole('menuitem', { name: 'Export Workspace...' })).toBeDisabled()
+  expect(screen.getByRole('menuitem', { name: 'Generate Code...' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Import Workspace...' }))
+  expect(screen.getByRole('dialog', { name: 'Import Workspace' })).toBeInTheDocument()
+})
+
+it('refreshes the Workspace list after a confirmed Workspace import', async () => {
+  const list = vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'w', name: 'Workspace' }] })
+  window.requestStudio = {
+    workspaces: { list },
+    collections: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    savedRequests: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    experiments: { list: vi.fn().mockResolvedValue({ ok: true, data: [] }) },
+    workspaceImport: {
+      preview: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          selected: true,
+          previewId: '00000000-0000-4000-8000-000000000001',
+          preview: {
+            format: 'request-studio.workspace', version: 1, workspaceName: 'Imported',
+            counts: { collections: 0, requests: 0, environments: 0, variables: 0 },
+            warnings: [], conflicts: [], blockedOperationCount: 0,
+          },
+        },
+      }),
+      apply: vi.fn().mockResolvedValue({
+        ok: true,
+        data: { mode: 'create-workspace', counts: { collections: 0, requests: 0, environments: 0, variables: 0 } },
+      }),
+    },
+    streaming: { onEvent: vi.fn() },
+    http: { onExecutionEvent: vi.fn() },
+  }
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Tools' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Import Workspace...' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Select Workspace File' }))
+  await screen.findByText('Imported', { selector: 'strong' })
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to Import' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Import Workspace' }))
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+  expect(await screen.findByRole('status')).toHaveTextContent('Workspace imported successfully.')
+})
+
 it('opens and closes Code Generation from the Tools menu with the selected request', async () => {
   window.requestStudio = {
     workspaces: { list: vi.fn().mockResolvedValue({ ok: true, data: [{ id: 'w', name: 'Workspace' }] }) },

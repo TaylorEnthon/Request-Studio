@@ -132,6 +132,39 @@ it('reads only the five allowed workspace export source groups', () => {
   expect(repo.getWorkspaceExportSource('missing')).toBeUndefined()
 })
 
+it('previews a Workspace import without writing rows', () => {
+  const {db,repo,source}=setupWorkspaceImport()
+  expect(repo.previewWorkspaceImport(source,'create-workspace')).toMatchObject({
+    ok:true,
+    dryRun:{
+      mode:'create-workspace',
+      summary:{collectionCount:1,requestCount:1,environmentCount:1,variableCount:1,conflictCount:0},
+    },
+  })
+  expect(db.prepare('SELECT count(*) count FROM workspaces').get()).toEqual({count:0})
+})
+
+it('previews merge conflicts against the live target Workspace', () => {
+  const {repo,source}=setupWorkspaceImport()
+  repo.create('workspaces',{id:'target',name:'Target'})
+  repo.create('collections',{id:'existing-c',workspace_id:'target',name:'API'})
+  expect(repo.previewWorkspaceImport(source,'merge-into-workspace','target')).toMatchObject({
+    ok:true,
+    dryRun:{mode:'merge-into-workspace',summary:{conflictCount:1}},
+  })
+  expect(repo.previewWorkspaceImport(source,'merge-into-workspace','missing')).toMatchObject({
+    ok:false,error:{code:'TARGET_WORKSPACE_NOT_FOUND'},
+  })
+})
+
+it('rejects unsafe Workspace import text before returning a preview', () => {
+  const {repo}=setupWorkspaceImport(),unsafe=workspaceImportBundle()
+  unsafe.workspace.name='C:\\Users\\Example\\secret.txt'
+  const result=repo.previewWorkspaceImport(JSON.stringify(unsafe),'create-workspace')
+  expect(result).toMatchObject({ok:false,error:{code:'UNSAFE_IMPORT_CONTENT'}})
+  expect(JSON.stringify(result)).not.toMatch(/Users|secret\.txt|file:\/\/\//)
+})
+
 it('applies a clean Workspace bundle atomically with private sourceRef mappings', () => {
   const {db,repo,source}=setupWorkspaceImport()
   const first=repo.applyWorkspaceImport({source,mode:'create-workspace'})

@@ -15,6 +15,7 @@ import { ExperimentRunner } from './experiments/experiment-runner'
 import { registerCurlImportHandlers } from './ipc/curl-import-handlers'
 import { registerRequestExportHandlers } from './ipc/request-export-handlers'
 import { registerWorkspaceExportHandlers } from './ipc/workspace-export-handlers'
+import { registerWorkspaceImportHandlers } from './ipc/workspace-import-handlers'
 import { registerCodeGenerationHandlers } from './ipc/code-generation-handlers'
 protocol.registerSchemesAsPrivileged([
   {
@@ -260,6 +261,7 @@ app
     registerCurlImportHandlers(repo)
     registerRequestExportHandlers(repo, userData)
     registerWorkspaceExportHandlers(repo, userData)
+    registerWorkspaceImportHandlers(repo)
     registerCodeGenerationHandlers(repo)
     httpService = registerHttpHandlers(db, path.join(userData, 'history-assets'), [streamAssets, experimentAssets])
     streamService = registerStreamingHandlers(db, {
