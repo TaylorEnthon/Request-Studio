@@ -114,6 +114,7 @@ it('locks controls while pending and closes on Escape when idle', async () => {
   expect(onClose).not.toHaveBeenCalled()
   finishPreview({ ok: true, data: previewState })
   await screen.findByText('Imported Workspace', { selector: 'strong' })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled())
   fireEvent.keyDown(window, { key: 'Escape' })
   expect(onClose).toHaveBeenCalledTimes(1)
 })
