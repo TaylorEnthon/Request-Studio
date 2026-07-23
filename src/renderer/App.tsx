@@ -9,6 +9,7 @@ import ExperimentWorkspace from './ExperimentWorkspace'
 import CurlImportPanel from './CurlImportPanel'
 import RequestExportPanel from './RequestExportPanel'
 import WorkspaceExportPanel from './WorkspaceExportPanel'
+import WorkspaceImportPanel from './WorkspaceImportPanel'
 import CodeGenerationPanel from './CodeGenerationPanel'
 import { httpRequestDraftSchema } from '../shared/schemas/http'
 import {
@@ -83,6 +84,7 @@ export default function App() {
     [showCurlImport, setShowCurlImport] = useState(false),
     [showRequestExport, setShowRequestExport] = useState(false),
     [showWorkspaceExport, setShowWorkspaceExport] = useState(false),
+    [showWorkspaceImport, setShowWorkspaceImport] = useState(false),
     [showCodeGeneration, setShowCodeGeneration] = useState(false),
     [executionId, setExecutionId] = useState(''),
     [executionState, setExecutionState] = useState('idle'),
@@ -356,7 +358,6 @@ export default function App() {
           <button
             aria-haspopup="menu"
             aria-expanded={showTools}
-            disabled={!workspace}
             onClick={() => setShowTools((value) => !value)}
           >
             Tools
@@ -367,6 +368,16 @@ export default function App() {
                 role="menuitem"
                 onClick={() => {
                   setShowTools(false)
+                  setShowWorkspaceImport(true)
+                }}
+              >
+                Import Workspace...
+              </button>
+              <button
+                role="menuitem"
+                disabled={!workspace}
+                onClick={() => {
+                  setShowTools(false)
                   setShowCurlImport(true)
                 }}
               >
@@ -374,6 +385,7 @@ export default function App() {
               </button>
               <button
                 role="menuitem"
+                disabled={!workspace}
                 onClick={() => {
                   setShowTools(false)
                   setShowRequestExport(true)
@@ -383,6 +395,7 @@ export default function App() {
               </button>
               <button
                 role="menuitem"
+                disabled={!workspace}
                 onClick={() => {
                   setShowTools(false)
                   setShowWorkspaceExport(true)
@@ -392,6 +405,7 @@ export default function App() {
               </button>
               <button
                 role="menuitem"
+                disabled={!workspace}
                 onClick={() => {
                   setShowTools(false)
                   setShowCodeGeneration(true)
@@ -554,6 +568,14 @@ export default function App() {
           workspaces={workspaces}
           initialWorkspaceId={workspace}
           onClose={() => setShowWorkspaceExport(false)}
+        />
+      )}
+      {showWorkspaceImport && (
+        <WorkspaceImportPanel
+          workspaces={workspaces}
+          initialWorkspaceId={workspace}
+          onClose={() => setShowWorkspaceImport(false)}
+          onImported={load}
         />
       )}
       {showCodeGeneration && (
