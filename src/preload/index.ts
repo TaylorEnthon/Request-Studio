@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('requestStudio', {
     preview: (input: unknown) => invoke('workspace-export:preview', input),
     save: (previewId: string) => invoke('workspace-export:save', { previewId }),
   },
+  workspaceImport: {
+    preview: (input: unknown) => invoke('workspace-import:preview', input),
+    apply: (previewId: string) => invoke('workspace-import:apply', { previewId }),
+  },
   codeGeneration: {
     list: () => invoke('code-generation:list'),
     preview: (input: unknown) => invoke('code-generation:preview', input),
