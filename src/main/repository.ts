@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { CurlImportSavePlan } from '../shared/curl/curl-import-save'
-import type { WorkspaceExportSource } from '../shared/assets/workspace-export'
+import type { WorkspaceExportSource, WorkspaceExportV1 } from '../shared/assets/workspace-export'
 import {
   mapWorkspaceImportRequestValues,
   prepareWorkspaceImportApply,
@@ -10,7 +10,12 @@ import {
   type WorkspaceImportApplyRequest,
   type WorkspaceImportApplyResult,
 } from '../shared/assets/workspace-import-apply'
-import { createWorkspaceImportDryRun, parseWorkspaceImportSource, type WorkspaceImportTargetSnapshot } from '../shared/assets/workspace-import'
+import {
+  createWorkspaceImportDryRun,
+  parseWorkspaceImportSource,
+  type WorkspaceImportMode,
+  type WorkspaceImportTargetSnapshot,
+} from '../shared/assets/workspace-import'
 
 const now = () => new Date().toISOString()
 export class Repository {
@@ -71,6 +76,34 @@ export class Repository {
         JOIN environments e ON e.id=v.environment_id WHERE e.workspace_id=? ORDER BY v.key,v.id`).all(workspaceId) as WorkspaceExportSource['variables'],
     }
   }
+  private analyzeWorkspaceImport(bundle: WorkspaceExportV1, mode: WorkspaceImportMode, targetWorkspaceId?: string) {
+    if(mode==='create-workspace'){
+      const existingWorkspaceNames=(this.db.prepare('SELECT name FROM workspaces ORDER BY name,id').all() as {name:string}[]).map(({name})=>name)
+      return createWorkspaceImportDryRun(bundle,{mode,existingWorkspaceNames})
+    }
+    if(!targetWorkspaceId)return createWorkspaceImportDryRun(bundle,{mode,target:null})
+    const workspace=this.db.prepare('SELECT name FROM workspaces WHERE id=?').get(targetWorkspaceId) as {name:string}|undefined
+    if(!workspace)return createWorkspaceImportDryRun(bundle,{mode,target:null})
+    const collections=this.db.prepare('SELECT id,name FROM collections WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {id:string;name:string}[]
+    const environments=this.db.prepare('SELECT id,name FROM environments WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {id:string;name:string}[]
+    const requests=this.db.prepare('SELECT collection_id,name FROM saved_requests WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {collection_id:string;name:string}[]
+    const variables=this.db.prepare(`SELECT v.environment_id,v.key FROM environment_variables v JOIN environments e ON e.id=v.environment_id
+      WHERE e.workspace_id=? ORDER BY v.key,v.id`).all(targetWorkspaceId) as {environment_id:string;key:string}[]
+    const target:WorkspaceImportTargetSnapshot={
+      workspaceName:workspace.name,
+      collections:collections.map(({id,name})=>({name,requests:requests.filter((request)=>request.collection_id===id).map((request)=>request.name)})),
+      environments:environments.map(({id,name})=>({name,variables:variables.filter((variable)=>variable.environment_id===id).map((variable)=>variable.key)})),
+    }
+    return createWorkspaceImportDryRun(bundle,{mode,target})
+  }
+  previewWorkspaceImport(source: unknown, mode: WorkspaceImportMode, targetWorkspaceId?: string) {
+    const parsed=parseWorkspaceImportSource(source)
+    if(!parsed.ok)return parsed
+    const dryRun=this.analyzeWorkspaceImport(parsed.bundle,mode,targetWorkspaceId)
+    if(!dryRun.ok)return dryRun
+    const safe=prepareWorkspaceImportApply(parsed.bundle,dryRun.dryRun)
+    return safe.ok?dryRun:safe
+  }
   applyWorkspaceImport(input: WorkspaceImportApplyRequest | unknown): WorkspaceImportApplyResult {
     try {
       return this.db.transaction((): WorkspaceImportApplyResult => {
@@ -82,32 +115,16 @@ export class Repository {
         if(request.resolutions!==undefined&&!Array.isArray(request.resolutions))return workspaceImportApplyFailure('INVALID_PLAN')
 
         let targetWorkspaceId:string|undefined
-        let analysis:unknown
-        if(request.mode==='create-workspace'){
-          analysis={mode:request.mode,existingWorkspaceNames:(this.db.prepare('SELECT name FROM workspaces ORDER BY name,id').all() as {name:string}[]).map(({name})=>name)}
-        }else{
+        if(request.mode==='merge-into-workspace'){
           targetWorkspaceId=request.targetWorkspaceId
           if(typeof targetWorkspaceId!=='string'||!targetWorkspaceId)return workspaceImportApplyFailure('INVALID_PLAN')
-          const workspace=this.db.prepare('SELECT name FROM workspaces WHERE id=?').get(targetWorkspaceId) as {name:string}|undefined
-          if(!workspace)return {ok:false,error:{code:'TARGET_WORKSPACE_NOT_FOUND',message:'The target Workspace is unavailable.'}}
-          const collections=this.db.prepare('SELECT id,name FROM collections WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {id:string;name:string}[]
-          const environments=this.db.prepare('SELECT id,name FROM environments WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {id:string;name:string}[]
-          const requests=this.db.prepare('SELECT collection_id,name FROM saved_requests WHERE workspace_id=? ORDER BY name,id').all(targetWorkspaceId) as {collection_id:string;name:string}[]
-          const variables=this.db.prepare(`SELECT v.environment_id,v.key FROM environment_variables v JOIN environments e ON e.id=v.environment_id
-            WHERE e.workspace_id=? ORDER BY v.key,v.id`).all(targetWorkspaceId) as {environment_id:string;key:string}[]
-          const target:WorkspaceImportTargetSnapshot={
-            workspaceName:workspace.name,
-            collections:collections.map(({id,name})=>({name,requests:requests.filter((request)=>request.collection_id===id).map((request)=>request.name)})),
-            environments:environments.map(({id,name})=>({name,variables:variables.filter((variable)=>variable.environment_id===id).map((variable)=>variable.key)})),
-          }
-          analysis={mode:request.mode,target}
         }
 
-        const dryRun=createWorkspaceImportDryRun(parsed.bundle,analysis)
+        const dryRun=this.analyzeWorkspaceImport(parsed.bundle,request.mode,targetWorkspaceId)
         if(!dryRun.ok)return dryRun
         const prepared=prepareWorkspaceImportApply(parsed.bundle,dryRun.dryRun,request.resolutions)
         if(!prepared.ok)return prepared
-        const finalDryRun=createWorkspaceImportDryRun(prepared.bundle,analysis)
+        const finalDryRun=this.analyzeWorkspaceImport(prepared.bundle,request.mode,targetWorkspaceId)
         if(!finalDryRun.ok)return finalDryRun
         if(finalDryRun.dryRun.conflicts.length||finalDryRun.dryRun.operations.some(({status})=>status==='blocked'))return workspaceImportApplyFailure('IMPORT_CONFLICT')
 
